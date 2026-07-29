@@ -1,0 +1,24 @@
+.entry-list {
+  flex: 1;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+.entry-list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .entry-list {
+    background: #1a1a1a;
+  }
+
+  .entry-list-empty {
+    color: #666666;
+  }
+}

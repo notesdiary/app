@@ -1,0 +1,108 @@
+/**
+ * Design tokens for Notes Diary
+ * Colors and typography from the Netskope design system
+ *
+ * NOTE: Placeholder fonts — update with actual font files from the prototype
+ * when prototype design tokens (colors_and_type.css) are provided.
+ */
+
+:root {
+  /* Color tokens */
+  --color-navy: #081a59;
+  --color-cyan: #00a9ce;
+  --color-cyan-hover: #22d0ef;
+  --color-teal: #008c95;
+  --color-orange: #ff8200;
+  --color-border: #dde0ec;
+  --color-gray: #53565a;
+  --color-entry-text: #24304a;
+  --color-light-blue-surface: #d9faff;
+  --color-rail-bg: #f5fbfd;
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Typography - will be populated from tokens when available */
+  --font-family-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+    'Helvetica Neue', sans-serif;
+  --font-family-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
+    'Helvetica Neue', sans-serif;
+  --font-family-mono: 'Menlo', 'Monaco', 'Courier New', monospace;
+
+  /* Font sizes */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+
+  /* Font weights */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Spacing scale */
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+
+  /* Border radius */
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 220ms ease-in-out;
+  --transition-slow: 350ms ease-in-out;
+}
+
+/**
+ * @font-face declarations for custom fonts
+ * TODO: Add actual font files to src/assets/fonts/ and uncomment when available
+ *
+ * Example:
+ * @font-face {
+ *   font-family: 'Inter';
+ *   src: url('/fonts/Inter-Regular.ttf') format('truetype');
+ *   font-weight: 400;
+ *   font-style: normal;
+ * }
+ */
+
+/* Base styles */
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family-body);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-entry-text);
+  background-color: var(--color-white);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    color: #e0e0e0;
+    background-color: #1a1a1a;
+  }
+}
+

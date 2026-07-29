@@ -1,0 +1,20 @@
+.diary-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  flex: 1;
+  background: #ffffff;
+}
+
+.diary-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  .diary-view {
+    background: #1a1a1a;
+  }
+}
