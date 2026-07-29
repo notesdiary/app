@@ -1,1 +1,1 @@
-{"name":"Notes Diary","short_name":"Notes Diary","start_url":"/","display":"standalone","background_color":"#FFFFFF","lang":"en","scope":"/","description":"A local-first diary app with hashtag organization","theme_color":"#081A59","orientation":"portrait-primary"}
+{"name":"Notes Diary","short_name":"Notes Diary","start_url":"/notesdiary/","display":"standalone","background_color":"#FFFFFF","lang":"en","scope":"/notesdiary/","description":"A local-first diary app with hashtag organization","theme_color":"#081A59","orientation":"portrait-primary"}
