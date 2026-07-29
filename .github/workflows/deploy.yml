@@ -19,11 +19,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create .env file from secrets
-        run: echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" > .env.production
-
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
 
       - uses: peaceiris/actions-gh-pages@v4
         with:
