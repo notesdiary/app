@@ -50,6 +50,8 @@ export function DiaryView(props: DiaryViewProps) {
         <EntryList
           entries={props.entries}
           mode={props.mode}
+          selectedTags={props.selectedTags}
+          searchQuery={props.searchQuery}
           editingId={props.editingId}
           editText={props.editText}
           onEditTextChange={props.onEditTextChange}

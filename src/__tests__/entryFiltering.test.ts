@@ -92,7 +92,7 @@ describe('entryFiltering', () => {
       id: '1',
       date: '2024-01-15',
       time: '10:00',
-      text: 'First #work\nSecond #personal\nThird',
+      text: 'First #work\n\nSecond #personal\n\nThird',
       archived: false,
       createdAt: 0,
     };

@@ -4,7 +4,7 @@
 
 import { Entry } from '../types';
 import { ViewMode } from './mode';
-import { splitParts, splitParagraphs } from './tags';
+import { splitParts, splitSections } from './tags';
 
 export function filterEntries(
   entries: Entry[],
@@ -19,9 +19,9 @@ export function filterEntries(
     filtered = entries.filter(e => e.date === selectedDate);
   } else if (mode === 'tag') {
     filtered = entries.filter(e => {
-      const paragraphs = splitParagraphs(e.text);
-      return paragraphs.some(p => {
-        const parts = splitParts(p);
+      const sections = splitSections(e.text);
+      return sections.some(section => {
+        const parts = splitParts(section);
         const tags = parts.filter(pt => pt.isTag).map(pt => pt.text);
         return selectedTags.some(st => {
           if (st === '__untagged__') {
@@ -56,15 +56,15 @@ export function filterParagraphsInEntry(
   selectedTags: string[],
   searchQuery: string
 ): string[] {
-  const paragraphs = splitParagraphs(entry.text);
+  const sections = splitSections(entry.text);
 
   if (mode === 'day') {
-    return paragraphs;
+    return sections;
   }
 
   if (mode === 'tag') {
-    return paragraphs.filter(p => {
-      const parts = splitParts(p);
+    return sections.filter(section => {
+      const parts = splitParts(section);
       const tags = parts.filter(pt => pt.isTag).map(pt => pt.text);
       return selectedTags.some(st => {
         if (st === '__untagged__') {
@@ -77,8 +77,8 @@ export function filterParagraphsInEntry(
 
   if (mode === 'search') {
     const query = searchQuery.toLowerCase();
-    return paragraphs.filter(p => p.toLowerCase().includes(query));
+    return sections.filter(section => section.toLowerCase().includes(query));
   }
 
-  return paragraphs;
+  return sections;
 }

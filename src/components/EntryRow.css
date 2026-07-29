@@ -60,6 +60,7 @@
 .entry-paragraph {
   cursor: text;
   padding: 2px 0;
+  white-space: pre-wrap;
 }
 
 .tag-link {

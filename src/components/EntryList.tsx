@@ -6,6 +6,8 @@ import './EntryList.css';
 interface EntryListProps {
   entries: Entry[];
   mode: ViewMode;
+  selectedTags: string[];
+  searchQuery: string;
   editingId: string | null;
   editText: string;
   onEditTextChange: (text: string) => void;
@@ -27,6 +29,8 @@ export function EntryList(props: EntryListProps) {
           key={entry.id}
           entry={entry}
           mode={props.mode}
+          selectedTags={props.selectedTags}
+          searchQuery={props.searchQuery}
           isEditing={props.editingId === entry.id}
           editText={props.editText}
           onEditTextChange={props.onEditTextChange}

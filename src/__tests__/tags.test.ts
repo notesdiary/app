@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitParts, splitParagraphs, extractTags } from '../lib/tags';
+import { splitParts, splitSections, extractTags } from '../lib/tags';
 
 describe('tags', () => {
   describe('splitParts', () => {
@@ -55,35 +55,45 @@ describe('tags', () => {
     });
   });
 
-  describe('splitParagraphs', () => {
-    it('splits on newline', () => {
-      const result = splitParagraphs('line1\nline2\nline3');
-      expect(result).toEqual(['line1', 'line2', 'line3']);
-    });
-
-    it('trims each paragraph', () => {
-      const result = splitParagraphs('  line1  \n  line2  ');
-      expect(result).toEqual(['line1', 'line2']);
-    });
-
-    it('filters empty paragraphs', () => {
-      const result = splitParagraphs('line1\n\n\nline2');
-      expect(result).toEqual(['line1', 'line2']);
-    });
-
-    it('returns single empty string for all-empty input', () => {
-      const result = splitParagraphs('');
-      expect(result).toEqual(['']);
-    });
-
-    it('returns single empty string for whitespace-only input', () => {
-      const result = splitParagraphs('   \n\n   ');
-      expect(result).toEqual(['']);
-    });
-
-    it('handles single line', () => {
-      const result = splitParagraphs('single line');
+  describe('splitSections', () => {
+    it('single line, no breaks', () => {
+      const result = splitSections('single line');
       expect(result).toEqual(['single line']);
+    });
+
+    it('two lines with single newline stay one section with break preserved', () => {
+      const result = splitSections('line1\nline2');
+      expect(result).toEqual(['line1\nline2']);
+    });
+
+    it('blank-line-separated paragraphs become separate sections', () => {
+      const result = splitSections('para1\n\npara2');
+      expect(result).toEqual(['para1', 'para2']);
+    });
+
+    it('multiple blank lines collapse to single boundary', () => {
+      const result = splitSections('para1\n\n\n\npara2');
+      expect(result).toEqual(['para1', 'para2']);
+    });
+
+    it('leading and trailing blank lines are trimmed', () => {
+      const result = splitSections('\n\npara1\n\n');
+      expect(result).toEqual(['para1']);
+    });
+
+    it('section with internal line breaks plus blank-line-separated section', () => {
+      const result = splitSections('line1\nline2\n\npara2');
+      expect(result).toEqual(['line1\nline2', 'para2']);
+    });
+
+    it('all-whitespace and empty input return empty array', () => {
+      expect(splitSections('')).toEqual([]);
+      expect(splitSections('   \n\n   ')).toEqual([]);
+    });
+
+    it('three-section entry mixing single breaks and paragraph breaks', () => {
+      const result = splitSections('a\nb\n\nc\n\n\nd\ne\nf');
+      expect(result).toEqual(['a\nb', 'c', 'd\ne\nf']);
     });
   });
 

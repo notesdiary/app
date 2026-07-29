@@ -52,12 +52,31 @@ export function splitParts(text: string): Part[] {
 }
 
 /**
- * Split text into paragraphs (split by newline).
- * Returns trimmed, non-empty paragraphs. If all empty, returns [''].
+ * Split text into sections. A section is one or more consecutive non-blank
+ * lines; a run of one or more blank lines separates sections. Internal line
+ * breaks within a section are preserved. Leading/trailing blank lines are
+ * trimmed and do not produce empty sections.
  */
-export function splitParagraphs(text: string): string[] {
-  const paragraphs = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
-  return paragraphs.length > 0 ? paragraphs : [''];
+export function splitSections(text: string): string[] {
+  const lines = text.split('\n');
+  const sections: string[] = [];
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (line.trim().length === 0) {
+      if (current.length > 0) {
+        sections.push(current.join('\n'));
+        current = [];
+      }
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    sections.push(current.join('\n'));
+  }
+
+  return sections;
 }
 
 /**

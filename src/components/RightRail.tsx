@@ -1,5 +1,5 @@
 import { Entry } from '../types';
-import { splitParts, splitParagraphs } from '../lib/tags';
+import { splitParts, splitSections } from '../lib/tags';
 import './RightRail.css';
 
 interface RightRailProps {
@@ -16,9 +16,9 @@ export function RightRail(props: RightRailProps) {
   let untaggedCount = 0;
 
   props.entries.forEach(entry => {
-    const paragraphs = splitParagraphs(entry.text);
-    paragraphs.forEach(p => {
-      const parts = splitParts(p);
+    const sections = splitSections(entry.text);
+    sections.forEach(section => {
+      const parts = splitParts(section);
       const tags = parts.filter(pt => pt.isTag).map(pt => pt.text);
 
       if (tags.length === 0) {

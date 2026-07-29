@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Entry } from '../types';
 import { formatTime, formatDate } from '../lib/dateUtils';
 import { splitParts } from '../lib/tags';
+import { filterParagraphsInEntry } from '../lib/entryFiltering';
 import { ViewMode } from '../lib/mode';
 import { useAutoGrowTextarea } from '../hooks/useAutoGrowTextarea';
 import './EntryRow.css';
@@ -9,6 +10,8 @@ import './EntryRow.css';
 interface EntryRowProps {
   entry: Entry;
   mode: ViewMode;
+  selectedTags: string[];
+  searchQuery: string;
   isEditing: boolean;
   editText: string;
   onEditTextChange: (text: string) => void;
@@ -60,30 +63,26 @@ export const EntryRow: React.FC<EntryRowProps> = (props) => {
       </div>
 
       <div className="entry-paragraphs">
-        {props.entry.text.split('\n').map((line, idx) => {
-          const trimmed = line.trim();
-          if (!trimmed) return null;
-
-          const parts = splitParts(trimmed);
+        {filterParagraphsInEntry(props.entry, props.mode, props.selectedTags, props.searchQuery).map((section, idx) => {
+          const parts = splitParts(section);
           return (
             <div key={idx} className="entry-paragraph" onClick={props.onClickToEdit}>
-              {parts.map((part, pidx) => {
-                if (part.isTag) {
-                  return (
-                    <button
-                      key={pidx}
-                      className="tag-link"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        props.onTagClick(part.text, e);
-                      }}
-                    >
-                      {part.text}
-                    </button>
-                  );
-                }
-                return <span key={pidx}>{part.text}</span>;
-              })}
+              {parts.map((part, i) =>
+                part.isTag ? (
+                  <button
+                    key={i}
+                    className="tag-link"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      props.onTagClick(part.text, e);
+                    }}
+                  >
+                    {part.text}
+                  </button>
+                ) : (
+                  <span key={i}>{part.text}</span>
+                )
+              )}
             </div>
           );
         })}
