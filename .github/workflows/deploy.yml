@@ -12,14 +12,15 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Create .env file from secrets
+        run: echo "VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}" > .env.production
 
       - run: npm ci
       - run: npm run build
