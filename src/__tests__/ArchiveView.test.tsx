@@ -258,7 +258,7 @@ describe('ArchiveView', () => {
   });
 
   it('handles multiline entries by rendering each paragraph', async () => {
-    const entry = await createEntry('2026-07-15', '10:30', 'Line 1\nLine 2\nLine 3');
+    const entry = await createEntry('2026-07-15', '10:30', 'Line 1\n\nLine 2\n\nLine 3');
     await archiveEntry(entry.id);
 
     const mockBackClick = vi.fn();

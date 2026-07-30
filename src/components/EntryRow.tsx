@@ -1,10 +1,10 @@
 import React, { useRef, useState } from 'react';
 import { Entry } from '../types';
 import { formatTime, formatDate } from '../lib/dateUtils';
-import { splitParts } from '../lib/tags';
 import { filterParagraphsInEntry } from '../lib/entryFiltering';
 import { ViewMode } from '../lib/mode';
 import { useAutoGrowTextarea } from '../hooks/useAutoGrowTextarea';
+import { EntryContent } from './EntryContent';
 import './EntryRow.css';
 
 interface EntryRowProps {
@@ -63,29 +63,15 @@ export const EntryRow: React.FC<EntryRowProps> = (props) => {
       </div>
 
       <div className="entry-paragraphs">
-        {filterParagraphsInEntry(props.entry, props.mode, props.selectedTags, props.searchQuery).map((section, idx) => {
-          const parts = splitParts(section);
-          return (
-            <div key={idx} className="entry-paragraph" onClick={props.onClickToEdit}>
-              {parts.map((part, i) =>
-                part.isTag ? (
-                  <button
-                    key={i}
-                    className="tag-link"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      props.onTagClick(part.text, e);
-                    }}
-                  >
-                    {part.text}
-                  </button>
-                ) : (
-                  <span key={i}>{part.text}</span>
-                )
-              )}
-            </div>
-          );
-        })}
+        {filterParagraphsInEntry(props.entry, props.mode, props.selectedTags, props.searchQuery).map((section, idx) => (
+          <EntryContent
+            key={idx}
+            text={section}
+            interactive={true}
+            onTagClick={props.onTagClick}
+            onSectionClick={props.onClickToEdit}
+          />
+        ))}
       </div>
     </div>
   );

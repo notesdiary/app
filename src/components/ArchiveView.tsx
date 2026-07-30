@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Entry } from '../types';
 import { formatTime, formatDate } from '../lib/dateUtils';
-import { splitParts } from '../lib/tags';
 import { listAllArchivedEntries, restoreEntry, deleteEntryForever } from '../lib/entriesRepo';
+import { EntryContent } from './EntryContent';
 import './ArchiveView.css';
 
 interface ArchiveViewProps {
@@ -153,28 +153,7 @@ export function ArchiveView(props: ArchiveViewProps) {
                             <div className="entry-date">{md}</div>
                           </div>
 
-                          <div className="entry-paragraphs">
-                            {entry.text.split('\n').map((line, idx) => {
-                              const trimmed = line.trim();
-                              if (!trimmed) return null;
-
-                              const parts = splitParts(trimmed);
-                              return (
-                                <div key={idx} className="entry-paragraph">
-                                  {parts.map((part, pidx) => {
-                                    if (part.isTag) {
-                                      return (
-                                        <span key={pidx} className="tag-text">
-                                          {part.text}
-                                        </span>
-                                      );
-                                    }
-                                    return <span key={pidx}>{part.text}</span>;
-                                  })}
-                                </div>
-                              );
-                            })}
-                          </div>
+                          <EntryContent text={entry.text} interactive={false} />
 
                           <div className="entry-actions">
                             <button
