@@ -64,6 +64,16 @@ export async function deleteEntryForever(id: string): Promise<void> {
   await db.delete('entries', id);
 }
 
+export async function putEntries(entries: Entry[]): Promise<void> {
+  if (entries.length === 0) return;
+  const db = await getDB();
+  const tx = db.transaction('entries', 'readwrite');
+  await Promise.all([
+    ...entries.map(entry => tx.store.put(entry)),
+    tx.done,
+  ]);
+}
+
 export async function listAllEntries(): Promise<Entry[]> {
   const db = await getDB();
   const allEntries = await db.getAll('entries');

@@ -3,7 +3,7 @@ import { Entry, FileSyncState, SyncMode, FilterRule } from './types';
 import { getTodayISO } from './lib/dateUtils';
 import { deriveMode } from './lib/mode';
 import { filterEntries, filterParagraphsInEntry } from './lib/entryFiltering';
-import { listAllEntries, createEntry, updateEntryText, archiveEntry } from './lib/entriesRepo';
+import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries } from './lib/entriesRepo';
 import { getExtraDates, addExtraDate, getDriveMeta, setDriveMeta, getFileSyncState, setFileSyncState, getSyncMode, setSyncMode, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
 import { getAccessToken, requestAccessToken, revokeToken, getAuthStatus } from './lib/googleAuth';
 import { findOrCreateAppFolder, listBackupFiles, uploadMonthFile, downloadMonthFile, extractMonthFromFilename, uploadNamedFile, deleteFile, ensureJsonExtension } from './lib/driveApi';
@@ -439,9 +439,15 @@ function App() {
       if (driveFileId) {
         // File exists on Drive — fetch remote, merge, and upload
         const remoteEntries = await downloadMonthFile(token, driveFileId);
-        const merged = localEntries.concat(
-          remoteEntries.filter(r => !localEntries.find(l => l.id === r.id))
-        );
+        const remoteOnly = remoteEntries.filter(r => !localEntries.find(l => l.id === r.id));
+        const merged = localEntries.concat(remoteOnly);
+
+        // Persist remote-only entries locally so they appear in the app
+        if (remoteOnly.length > 0) {
+          await putEntries(remoteOnly);
+          setEntries(prev => prev.concat(remoteOnly.filter(r => !prev.find(l => l.id === r.id))));
+        }
+
         await uploadMonthFile(token, driveFolderId, monthKey, merged, driveFileId);
       } else {
         // No remote file yet — create one with local entries
@@ -501,9 +507,15 @@ function App() {
       if (driveFileId) {
         // File exists on Drive — union local with remote (local wins on id collision)
         const remoteEntries = await downloadMonthFile(token, driveFileId);
-        const merged = localMatches.concat(
-          remoteEntries.filter(r => !localMatches.find(l => l.id === r.id))
-        );
+        const remoteOnly = remoteEntries.filter(r => !localMatches.find(l => l.id === r.id));
+        const merged = localMatches.concat(remoteOnly);
+
+        // Persist remote-only entries locally so they appear in the app
+        if (remoteOnly.length > 0) {
+          await putEntries(remoteOnly);
+          setEntries(prev => prev.concat(remoteOnly.filter(r => !prev.find(l => l.id === r.id))));
+        }
+
         await uploadNamedFile(token, driveFolderId, fileName, merged, driveFileId);
       } else {
         // No remote file yet — create one with local matches
@@ -576,7 +588,11 @@ function App() {
       }
       for (const monthKey of fileMonthKeysArray) {
         if (!localMonthKeys.has(monthKey)) {
-          newSyncState[monthKey] = { status: 'remote-pending' };
+          const driveFileId = files.find((f: any) => {
+            const mKey = extractMonthFromFilename(f.name);
+            return mKey === monthKey;
+          })?.id;
+          newSyncState[monthKey] = { status: 'remote-pending', driveFileId };
         }
       }
 
