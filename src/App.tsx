@@ -103,14 +103,7 @@ function App() {
 
     const intervalId = setInterval(async () => {
       try {
-        if (syncMode === 'filters') {
-          const dup = getDuplicateFilenameRuleIds(filterRules);
-          const runnable = filterRules.filter(r => !isRuleSkippable(r) && !dup.has(r.id));
-          await Promise.all(runnable.map(r => syncFilterRule(r.id)));
-        } else {
-          const monthKeys = Object.keys(fileSyncState);
-          await Promise.all(monthKeys.map(key => syncMonth(key)));
-        }
+        await syncAllNow();
       } catch (error) {
         console.error('Auto-sync failed:', error);
       }
@@ -416,7 +409,7 @@ function App() {
     return folderId;
   };
 
-  const syncMonth = async (monthKey: string) => {
+  const syncMonth = async (monthKey: string, driveFileIdOverride?: string) => {
     setFileSyncStateLocal(prev => ({
       ...prev,
       [monthKey]: { ...prev[monthKey], status: 'syncing' },
@@ -432,8 +425,11 @@ function App() {
         e => e.date.startsWith(monthKey) && !e.archived
       );
 
-      // Get Drive file ID if sync was previously attempted
-      const driveFileId = fileSyncState[monthKey]?.driveFileId;
+      // Get Drive file ID if sync was previously attempted. An override may
+      // be passed in when the caller just ran discovery in this same call
+      // chain — React state from that discovery hasn't re-rendered yet, so
+      // fileSyncState here would otherwise still be stale.
+      const driveFileId = driveFileIdOverride ?? fileSyncState[monthKey]?.driveFileId;
 
       // Sync strategy: merge local + remote (local wins on ID collision)
       if (driveFileId) {
@@ -502,7 +498,16 @@ function App() {
         return;
       }
 
-      const driveFileId = filterSyncState[id]?.driveFileId;
+      let driveFileId = filterSyncState[id]?.driveFileId;
+
+      if (!driveFileId) {
+        // Self-heal: a file with this name may already exist on Drive (e.g.
+        // uploaded from another device) even though this browser never
+        // recorded its file ID locally.
+        const existingFilename = ensureJsonExtension(fileName);
+        const files = await listBackupFiles(token, driveFolderId);
+        driveFileId = files.find(f => f.name === existingFilename)?.id;
+      }
 
       if (driveFileId) {
         // File exists on Drive — union local with remote (local wins on id collision)
@@ -545,8 +550,14 @@ function App() {
   };
 
   const syncAllMonths = async () => {
-    const monthKeys = Object.keys(fileSyncState);
-    await Promise.all(monthKeys.map(key => syncMonth(key)));
+    // Re-discover first: months that exist only in Drive (created on another
+    // device, or added since the last discovery) aren't in fileSyncState yet
+    // and would otherwise never be picked up for syncing.
+    const token = await getAccessToken();
+    const discovered = await handleDiscoverDriveFolder(token);
+    const stateToUse = discovered ?? fileSyncState;
+    const monthKeys = Object.keys(stateToUse);
+    await Promise.all(monthKeys.map(key => syncMonth(key, stateToUse[key]?.driveFileId)));
   };
 
   const syncAllFilters = async () => {
@@ -563,7 +574,7 @@ function App() {
     }
   };
 
-  const handleDiscoverDriveFolder = async (token: string) => {
+  const handleDiscoverDriveFolder = async (token: string): Promise<Record<string, FileSyncState> | undefined> => {
     try {
       const folderId = await findOrCreateAppFolder(token);
       setDriveFolderId(folderId);
@@ -598,6 +609,7 @@ function App() {
 
       setFileSyncStateLocal(newSyncState);
       await setFileSyncState(newSyncState);
+      return newSyncState;
     } catch (error) {
       console.error('Failed to discover Drive folder:', error);
     }
