@@ -50,35 +50,35 @@ export default defineConfig({
         background_color: '#FFFFFF',
         theme_color: '#081A59',
         orientation: 'portrait-primary',
+        icons: [
+          {
+            src: 'icons/icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icons/icon-512x512-maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          {
+            src: 'icons/apple-touch-icon-180x180.png',
+            sizes: '180x180',
+            type: 'image/png',
+          },
+        ],
       },
       includeAssets: [
         'favicon.ico',
         'apple-touch-icon.png',
-      ],
-      icons: [
-        {
-          src: '/icons/icon-192x192.png',
-          sizes: '192x192',
-          type: 'image/png',
-          purpose: 'any',
-        },
-        {
-          src: '/icons/icon-512x512.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'any',
-        },
-        {
-          src: '/icons/icon-512x512-maskable.png',
-          sizes: '512x512',
-          type: 'image/png',
-          purpose: 'maskable',
-        },
-        {
-          src: '/icons/apple-touch-icon-180x180.png',
-          sizes: '180x180',
-          type: 'image/png',
-        },
       ],
     }),
   ],
