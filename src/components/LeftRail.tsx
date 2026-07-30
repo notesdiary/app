@@ -11,6 +11,7 @@ interface LeftRailProps {
   extraDates: string[];
   onSettingsClick: () => void;
   onArchiveClick: () => void;
+  onAboutClick: () => void;
   isMobile: boolean;
   isOpen: boolean;
 }
@@ -119,6 +120,9 @@ export function LeftRail(props: LeftRailProps) {
         </button>
         <button className="nav-button" onClick={props.onSettingsClick}>
           Settings
+        </button>
+        <button className="nav-button" onClick={props.onAboutClick}>
+          About
         </button>
       </div>
     </div>

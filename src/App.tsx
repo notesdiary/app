@@ -13,10 +13,11 @@ import { RightRail } from './components/RightRail';
 import { DiaryView } from './components/DiaryView';
 import { ArchiveView } from './components/ArchiveView';
 import { SettingsView } from './components/SettingsView';
+import { AboutView } from './components/AboutView';
 import { Backdrop } from './components/Backdrop';
 import './App.css';
 
-type ViewType = 'diary' | 'settings' | 'archive';
+type ViewType = 'diary' | 'settings' | 'archive' | 'about';
 
 function App() {
   // State: entries and metadata
@@ -367,6 +368,12 @@ function App() {
     closeDrawersOnMobile();
   };
 
+  // Handle about click
+  const handleAboutClick = () => {
+    setView('about');
+    closeDrawersOnMobile();
+  };
+
   // Helper functions for filter sync
   const isRuleSkippable = (rule: FilterRule): boolean => {
     const filterEmpty = !rule.filter.trim();
@@ -670,6 +677,7 @@ function App() {
         extraDates={extraDates}
         onSettingsClick={handleSettingsClick}
         onArchiveClick={handleArchiveClick}
+        onAboutClick={handleAboutClick}
         isMobile={isMobile}
         isOpen={leftOpen}
       />
@@ -725,6 +733,7 @@ function App() {
           />
         )}
         {view === 'archive' && <ArchiveView onBackClick={() => setView('diary')} />}
+        {view === 'about' && <AboutView onBack={() => setView('diary')} />}
       </main>
 
       {!isMobile && (

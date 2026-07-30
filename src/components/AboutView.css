@@ -1,0 +1,192 @@
+.about-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.about-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: #0066cc;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 8px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.back-button:hover {
+  color: #0052a3;
+}
+
+.about-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.about-title-section {
+  margin-bottom: 32px;
+}
+
+.about-title {
+  font-size: 32px;
+  font-weight: 600;
+  margin: 0;
+  color: #1a1a1a;
+}
+
+.about-card {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.about-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 24px 0;
+  color: #1a1a1a;
+}
+
+.about-section {
+  margin-bottom: 24px;
+}
+
+.about-section:last-child {
+  margin-bottom: 0;
+}
+
+.about-subsection-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: #1a1a1a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 12px;
+  color: #00a9ce;
+}
+
+.about-text {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+}
+
+.about-text:last-child {
+  margin-bottom: 0;
+}
+
+.about-text strong {
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.about-list {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.about-list li {
+  margin-bottom: 8px;
+}
+
+.about-list li:last-child {
+  margin-bottom: 0;
+}
+
+.about-ordered-list {
+  font-size: 14px;
+  color: #666;
+  margin: 0 0 12px 0;
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.about-ordered-list li {
+  margin-bottom: 8px;
+}
+
+.about-ordered-list li:last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .about-view {
+    background: #1a1a1a;
+  }
+
+  .about-header {
+    border-bottom-color: #333333;
+  }
+
+  .back-button {
+    color: #22d0ef;
+  }
+
+  .back-button:hover {
+    color: #00a9ce;
+  }
+
+  .about-title {
+    color: #e0e0e0;
+  }
+
+  .about-card {
+    background: #2a2a2a;
+    border-color: #333333;
+  }
+
+  .about-section-title {
+    color: #e0e0e0;
+  }
+
+  .about-subsection-title {
+    color: #22d0ef;
+  }
+
+  .about-text {
+    color: #999999;
+  }
+
+  .about-text strong {
+    color: #e0e0e0;
+  }
+
+  .about-list {
+    color: #999999;
+  }
+
+  .about-ordered-list {
+    color: #999999;
+  }
+}
+
+@media (max-width: 600px) {
+  .about-content {
+    padding: 16px;
+  }
+
+  .about-card {
+    padding: 16px;
+  }
+
+  .about-title {
+    font-size: 24px;
+  }
+}
