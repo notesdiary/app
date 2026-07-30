@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/notesdiary/',
+  base: '/app/',
   server: {
     port: 5173,
     strictPort: true,
@@ -44,8 +44,8 @@ export default defineConfig({
         name: 'Notes Diary',
         short_name: 'Notes Diary',
         description: 'A local-first diary app with hashtag organization',
-        start_url: '/notesdiary/',
-        scope: '/notesdiary/',
+        start_url: '/app/',
+        scope: '/app/',
         display: 'standalone',
         background_color: '#FFFFFF',
         theme_color: '#081A59',
