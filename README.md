@@ -1,1 +1,1 @@
-# yanotes
+Notes Diary App
