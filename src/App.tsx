@@ -430,6 +430,7 @@ function App() {
       // chain — React state from that discovery hasn't re-rendered yet, so
       // fileSyncState here would otherwise still be stale.
       const driveFileId = driveFileIdOverride ?? fileSyncState[monthKey]?.driveFileId;
+      let driveFileIdForState = driveFileId;
 
       // Sync strategy: merge local + remote (local wins on ID collision)
       if (driveFileId) {
@@ -448,24 +449,22 @@ function App() {
       } else {
         // No remote file yet — create one with local entries
         const fileId = await uploadMonthFile(token, driveFolderId, monthKey, localEntries);
-        setFileSyncStateLocal(prev => ({
-          ...prev,
-          [monthKey]: { ...prev[monthKey], driveFileId: fileId },
-        }));
+        driveFileIdForState = fileId;
       }
 
       // Mark as synced with timestamp
-      setFileSyncStateLocal(prev => ({
-        ...prev,
+      const nextFileSyncState = {
+        ...fileSyncState,
         [monthKey]: {
-          status: 'synced',
+          status: 'synced' as const,
           lastSynced: Date.now(),
-          driveFileId: prev[monthKey]?.driveFileId
+          driveFileId: driveFileIdForState,
         },
-      }));
+      };
+      setFileSyncStateLocal(nextFileSyncState);
 
       // Persist sync state
-      await setFileSyncState(fileSyncState);
+      await setFileSyncState(nextFileSyncState);
     } catch (error) {
       console.error(`Failed to sync month ${monthKey}:`, error);
       // Leave status as 'pending' or 'syncing' — user can retry
@@ -525,24 +524,22 @@ function App() {
       } else {
         // No remote file yet — create one with local matches
         const fileId = await uploadNamedFile(token, driveFolderId, fileName, localMatches);
-        setFilterSyncStateLocal(prev => ({
-          ...prev,
-          [id]: { ...prev[id], driveFileId: fileId },
-        }));
+        driveFileId = fileId;
       }
 
       // Mark as synced with timestamp
-      setFilterSyncStateLocal(prev => ({
-        ...prev,
+      const nextFilterSyncState = {
+        ...filterSyncState,
         [id]: {
-          status: 'synced',
+          status: 'synced' as const,
           lastSynced: Date.now(),
-          driveFileId: prev[id]?.driveFileId
+          driveFileId,
         },
-      }));
+      };
+      setFilterSyncStateLocal(nextFilterSyncState);
 
       // Persist sync state
-      await setFilterSyncState(filterSyncState);
+      await setFilterSyncState(nextFilterSyncState);
     } catch (error) {
       console.error(`Failed to sync filter rule ${id}:`, error);
       // Leave status as-is — user can retry
