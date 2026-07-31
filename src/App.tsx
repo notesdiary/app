@@ -6,7 +6,7 @@ import { filterEntries, filterParagraphsInEntry } from './lib/entryFiltering';
 import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries } from './lib/entriesRepo';
 import { getExtraDates, addExtraDate, getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
 import { getAccessToken, requestAccessToken, revokeToken, getAuthStatus } from './lib/googleAuth';
-import { findOrCreateAppFolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent } from './lib/driveApi';
+import { findOrCreateAppFolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent, DrivePermission, listPermissions, createPermission, createAnyonePermission, updatePermission, deletePermission } from './lib/driveApi';
 import { useWindowWidth } from './hooks/useWindowWidth';
 import { LeftRail } from './components/LeftRail';
 import { RightRail } from './components/RightRail';
@@ -479,6 +479,47 @@ function App() {
     await syncAllFilters();
   };
 
+  const loadSharePermissions = async (fileId: string): Promise<DrivePermission[]> => {
+    const token = await getAccessToken();
+    return listPermissions(token, fileId);
+  };
+
+  const invitePerson = async (fileId: string, email: string, role: string): Promise<DrivePermission> => {
+    const token = await getAccessToken();
+    return createPermission(token, fileId, { emailAddress: email, role });
+  };
+
+  const changePersonRole = async (fileId: string, permissionId: string, role: string): Promise<DrivePermission> => {
+    const token = await getAccessToken();
+    return updatePermission(token, fileId, permissionId, role);
+  };
+
+  const removePerson = async (fileId: string, permissionId: string): Promise<void> => {
+    const token = await getAccessToken();
+    return deletePermission(token, fileId, permissionId);
+  };
+
+  const changeGeneralAccess = async (
+    fileId: string,
+    access: 'restricted' | 'anyone',
+    role: string,
+    currentGeneralPermissionId?: string
+  ): Promise<DrivePermission | void> => {
+    const token = await getAccessToken();
+    if (access === 'anyone') {
+      return createAnyonePermission(token, fileId, role);
+    }
+    if (!currentGeneralPermissionId) {
+      throw new Error('Cannot restrict access: no existing general permission id provided');
+    }
+    return deletePermission(token, fileId, currentGeneralPermissionId);
+  };
+
+  const changeGeneralRole = async (fileId: string, permissionId: string, role: string): Promise<DrivePermission> => {
+    const token = await getAccessToken();
+    return updatePermission(token, fileId, permissionId, role);
+  };
+
   const handleDiscoverDriveFolder = async (token: string) => {
     try {
       const folderId = await findOrCreateAppFolder(token);
@@ -666,6 +707,12 @@ function App() {
             onUpdateFilterRule={updateFilterRule}
             onRemoveFilterRule={removeFilterRule}
             onSyncFilterRule={syncFilterRule}
+            onLoadSharePermissions={loadSharePermissions}
+            onInvitePerson={invitePerson}
+            onChangePersonRole={changePersonRole}
+            onRemovePerson={removePerson}
+            onChangeGeneralAccess={changeGeneralAccess}
+            onChangeGeneralRole={changeGeneralRole}
             onBack={() => setView('diary')}
           />
         )}

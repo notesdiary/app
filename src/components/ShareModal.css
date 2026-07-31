@@ -1,0 +1,419 @@
+.share-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(8, 26, 89, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.share-modal-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  width: 440px;
+  max-width: 92vw;
+  box-shadow: 0 8px 24px rgba(8, 26, 89, 0.25);
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.share-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.share-modal-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.share-modal-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: #081a59;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-modal-close-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.share-modal-close-button:hover {
+  background: #f0f8fb;
+}
+
+.share-modal-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #008c95;
+  margin-bottom: 8px;
+}
+
+.share-modal-people {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dde0ec;
+}
+
+.share-modal-loading,
+.share-modal-error {
+  font-size: 14px;
+  margin: 0;
+}
+
+.share-modal-loading {
+  color: #666666;
+}
+
+.share-modal-error {
+  color: #c0392b;
+}
+
+.share-modal-people-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.share-modal-person-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #dde0ec;
+}
+
+.share-modal-person-row:last-child {
+  border-bottom: none;
+}
+
+.share-modal-person-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  background: #d9faff;
+  color: #081a59;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.share-modal-person-email {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: #1a1a1a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-modal-person-owner {
+  font-size: 13px;
+  color: #666666;
+  flex-shrink: 0;
+}
+
+.share-modal-person-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.share-modal-person-role-select,
+.share-modal-general-access-select,
+.share-modal-general-role-select {
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1a1a1a;
+  background-color: #ffffff;
+  border: 1px solid #dde0ec;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  max-width: 100%;
+}
+
+.share-modal-person-role-select:focus,
+.share-modal-general-access-select:focus,
+.share-modal-general-role-select:focus {
+  outline: none;
+  border-color: #00a9ce;
+}
+
+.share-modal-person-remove-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.share-modal-person-remove-button:hover {
+  background: #f0f8fb;
+}
+
+.share-modal-invite-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.share-modal-invite-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1a1a1a;
+  background-color: #ffffff;
+  border: 1px solid #dde0ec;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.share-modal-invite-input:focus {
+  outline: none;
+  border-color: #00a9ce;
+}
+
+.share-modal-invite-button {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #ffffff;
+  background: #00a9ce;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.share-modal-invite-button:hover:not(:disabled) {
+  background: #22d0ef;
+}
+
+.share-modal-invite-button:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+}
+
+.share-modal-invite-error {
+  font-size: 13px;
+  color: #c0392b;
+  margin: 0 0 8px 0;
+}
+
+.share-modal-general-access {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dde0ec;
+}
+
+.share-modal-general-access-select,
+.share-modal-general-role-select {
+  width: fit-content;
+}
+
+.share-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.share-modal-copy-link-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1a1a1a;
+  background: #ffffff;
+  border: 1px solid #dde0ec;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.share-modal-copy-link-button:hover {
+  border-color: #00a9ce;
+  color: #00a9ce;
+}
+
+.share-modal-done-button {
+  font-size: 14px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #ffffff;
+  background: #081a59;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.share-modal-done-button:hover {
+  background: #0d2270;
+}
+
+@media (prefers-color-scheme: dark) {
+  .share-modal-overlay {
+    background: rgba(0, 0, 0, 0.6);
+  }
+
+  .share-modal-panel {
+    background: #2a2a2a;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .share-modal-title {
+    color: #e0e0e0;
+  }
+
+  .share-modal-close-button:hover {
+    background: #333333;
+  }
+
+  .share-modal-eyebrow {
+    color: #22d0ef;
+  }
+
+  .share-modal-people {
+    border-bottom-color: #333333;
+  }
+
+  .share-modal-loading {
+    color: #999999;
+  }
+
+  .share-modal-error {
+    color: #ff6b6b;
+  }
+
+  .share-modal-person-row {
+    border-bottom-color: #333333;
+  }
+
+  .share-modal-person-avatar {
+    background: #0d2270;
+    color: #e0e0e0;
+  }
+
+  .share-modal-person-email {
+    color: #e0e0e0;
+  }
+
+  .share-modal-person-owner {
+    color: #999999;
+  }
+
+  .share-modal-person-role-select,
+  .share-modal-general-access-select,
+  .share-modal-general-role-select {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border-color: #333333;
+  }
+
+  .share-modal-person-role-select:focus,
+  .share-modal-general-access-select:focus,
+  .share-modal-general-role-select:focus {
+    border-color: #00a9ce;
+  }
+
+  .share-modal-person-remove-button:hover {
+    background: #333333;
+  }
+
+  .share-modal-invite-input {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    border-color: #333333;
+  }
+
+  .share-modal-invite-input:focus {
+    border-color: #00a9ce;
+  }
+
+  .share-modal-invite-button:hover:not(:disabled) {
+    background: #22d0ef;
+  }
+
+  .share-modal-invite-button:disabled {
+    background: #555555;
+    color: #999999;
+  }
+
+  .share-modal-invite-error {
+    color: #ff6b6b;
+  }
+
+  .share-modal-general-access {
+    border-bottom-color: #333333;
+  }
+
+  .share-modal-copy-link-button {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    border-color: #333333;
+  }
+
+  .share-modal-copy-link-button:hover {
+    border-color: #00a9ce;
+    color: #22d0ef;
+  }
+
+  .share-modal-done-button {
+    background: #22d0ef;
+    color: #1a1a1a;
+  }
+
+  .share-modal-done-button:hover {
+    background: #00a9ce;
+  }
+}

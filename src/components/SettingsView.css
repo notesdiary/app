@@ -466,6 +466,30 @@
   cursor: not-allowed;
 }
 
+.share-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: #ffffff;
+  color: #53565A;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.share-button:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #1a1a1a;
+}
+
+.share-button:disabled {
+  color: #ccc;
+  border-color: #ddd;
+  cursor: not-allowed;
+}
+
 /* Modal styles */
 .modal-overlay {
   position: fixed;

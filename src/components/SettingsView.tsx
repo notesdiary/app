@@ -1,5 +1,15 @@
 import { useState } from 'react';
 import { FileSyncState, FilterRule } from '../types';
+import { DrivePermission } from '../lib/driveApi';
+import {
+  ShareModal,
+  ShareFileState,
+  SharePerson,
+  PersonRole,
+  GeneralAccess,
+  toDriveRole,
+  fromDriveRole,
+} from './ShareModal';
 import './SettingsView.css';
 
 interface SettingsViewProps {
@@ -17,6 +27,29 @@ interface SettingsViewProps {
   onRemoveFilterRule: (id: string, alsoDeleteFromDrive: boolean) => Promise<void>;
   onSyncFilterRule: (id: string) => Promise<void>;
   onBack: () => void;
+  onLoadSharePermissions: (fileId: string) => Promise<DrivePermission[]>;
+  onInvitePerson: (fileId: string, email: string, role: string) => Promise<DrivePermission>;
+  onChangePersonRole: (fileId: string, permissionId: string, role: string) => Promise<DrivePermission>;
+  onRemovePerson: (fileId: string, permissionId: string) => Promise<void>;
+  onChangeGeneralAccess: (
+    fileId: string,
+    access: 'restricted' | 'anyone',
+    role: string,
+    currentGeneralPermissionId?: string
+  ) => Promise<DrivePermission | void>;
+  onChangeGeneralRole: (fileId: string, permissionId: string, role: string) => Promise<DrivePermission>;
+}
+
+function SettingsShareIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="10.5" cy="3" r="1.8" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="10.5" cy="11" r="1.8" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="3.5" cy="7" r="1.8" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="5" y1="6.2" x2="9" y2="3.8" stroke="currentColor" strokeWidth="1.2" />
+      <line x1="5" y1="7.8" x2="9" y2="10.2" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
 }
 
 // Helper functions (6.1)
@@ -51,6 +84,8 @@ export function SettingsView(props: SettingsViewProps) {
   const [connectError, setConnectError] = useState<string | undefined>(undefined);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const [pendingRemoveRuleId, setPendingRemoveRuleId] = useState<string | null>(null);
+  const [shareModalOpenFileId, setShareModalOpenFileId] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<Record<string, ShareFileState>>({});
 
   const handleConnectClick = async () => {
     setIsConnecting(true);
@@ -80,6 +115,266 @@ export function SettingsView(props: SettingsViewProps) {
   const handleRemoveRuleConfirm = async (id: string, alsoDeleteFromDrive: boolean) => {
     await props.onRemoveFilterRule(id, alsoDeleteFromDrive);
     setPendingRemoveRuleId(null);
+  };
+
+  const handleOpenShare = async (fileId: string) => {
+    setShareModalOpenFileId(fileId);
+    if (shareState[fileId]) {
+      // Already loaded/loading — reuse cached state.
+      return;
+    }
+    setShareState((prev) => ({
+      ...prev,
+      [fileId]: {
+        isLoading: true,
+        generalAccess: 'restricted',
+        generalRole: 'viewer',
+        people: [],
+      },
+    }));
+    try {
+      const permissions = await props.onLoadSharePermissions(fileId);
+      const anyonePermission = permissions.find((p) => p.type === 'anyone');
+      const people: SharePerson[] = permissions
+        .filter((p) => p.type === 'user')
+        .map((p) => ({
+          permissionId: p.id,
+          email: p.emailAddress || '',
+          displayName: p.displayName,
+          role: fromDriveRole(p.role),
+        }));
+
+      setShareState((prev) => ({
+        ...prev,
+        [fileId]: {
+          isLoading: false,
+          generalAccess: anyonePermission ? 'anyone' : 'restricted',
+          generalRole: anyonePermission ? (fromDriveRole(anyonePermission.role) as PersonRole) : 'viewer',
+          generalPermissionId: anyonePermission?.id,
+          people,
+        },
+      }));
+    } catch (error) {
+      setShareState((prev) => ({
+        ...prev,
+        [fileId]: {
+          ...(prev[fileId] || { generalAccess: 'restricted', generalRole: 'viewer', people: [] }),
+          isLoading: false,
+          loadError: error instanceof Error ? error.message : 'Failed to load sharing settings',
+        },
+      }));
+    }
+  };
+
+  const handleCloseShare = () => {
+    setShareModalOpenFileId(null);
+  };
+
+  const handleInvite = async (fileId: string, email: string) => {
+    const optimisticId = `pending-${Date.now()}`;
+    const optimisticPerson: SharePerson = {
+      permissionId: optimisticId,
+      email,
+      role: 'viewer',
+    };
+
+    setShareState((prev) => {
+      const existing = prev[fileId];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [fileId]: { ...existing, people: [...existing.people, optimisticPerson] },
+      };
+    });
+
+    try {
+      const permission = await props.onInvitePerson(fileId, email, toDriveRole('viewer'));
+      setShareState((prev) => {
+        const existing = prev[fileId];
+        if (!existing) return prev;
+        return {
+          ...prev,
+          [fileId]: {
+            ...existing,
+            people: existing.people.map((p) =>
+              p.permissionId === optimisticId
+                ? {
+                    permissionId: permission.id,
+                    email: permission.emailAddress || email,
+                    displayName: permission.displayName,
+                    role: fromDriveRole(permission.role),
+                  }
+                : p
+            ),
+          },
+        };
+      });
+    } catch (error) {
+      setShareState((prev) => {
+        const existing = prev[fileId];
+        if (!existing) return prev;
+        return {
+          ...prev,
+          [fileId]: {
+            ...existing,
+            people: existing.people.filter((p) => p.permissionId !== optimisticId),
+          },
+        };
+      });
+      throw error;
+    }
+  };
+
+  const handleRoleChange = async (fileId: string, permissionId: string, role: PersonRole) => {
+    let previousRole: SharePerson['role'] | undefined;
+    setShareState((prev) => {
+      const existing = prev[fileId];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [fileId]: {
+          ...existing,
+          people: existing.people.map((p) => {
+            if (p.permissionId === permissionId) {
+              previousRole = p.role;
+              return { ...p, role };
+            }
+            return p;
+          }),
+        },
+      };
+    });
+
+    try {
+      await props.onChangePersonRole(fileId, permissionId, toDriveRole(role));
+    } catch (error) {
+      setShareState((prev) => {
+        const existing = prev[fileId];
+        if (!existing || previousRole === undefined) return prev;
+        return {
+          ...prev,
+          [fileId]: {
+            ...existing,
+            people: existing.people.map((p) =>
+              p.permissionId === permissionId ? { ...p, role: previousRole! } : p
+            ),
+          },
+        };
+      });
+    }
+  };
+
+  const handleRemove = async (fileId: string, permissionId: string) => {
+    let removedPerson: SharePerson | undefined;
+    let removedIndex = -1;
+    setShareState((prev) => {
+      const existing = prev[fileId];
+      if (!existing) return prev;
+      removedIndex = existing.people.findIndex((p) => p.permissionId === permissionId);
+      removedPerson = existing.people[removedIndex];
+      return {
+        ...prev,
+        [fileId]: {
+          ...existing,
+          people: existing.people.filter((p) => p.permissionId !== permissionId),
+        },
+      };
+    });
+
+    try {
+      await props.onRemovePerson(fileId, permissionId);
+    } catch (error) {
+      setShareState((prev) => {
+        const existing = prev[fileId];
+        if (!existing || !removedPerson) return prev;
+        const people = [...existing.people];
+        const insertAt = removedIndex >= 0 && removedIndex <= people.length ? removedIndex : people.length;
+        people.splice(insertAt, 0, removedPerson);
+        return { ...prev, [fileId]: { ...existing, people } };
+      });
+    }
+  };
+
+  const handleGeneralAccessChange = async (fileId: string, access: GeneralAccess) => {
+    const existing = shareState[fileId];
+    if (!existing) return;
+    const previousAccess = existing.generalAccess;
+    const previousPermissionId = existing.generalPermissionId;
+
+    setShareState((prev) => {
+      const current = prev[fileId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [fileId]: {
+          ...current,
+          generalAccess: access,
+          generalPermissionId: access === 'restricted' ? undefined : current.generalPermissionId,
+        },
+      };
+    });
+
+    try {
+      const result = await props.onChangeGeneralAccess(
+        fileId,
+        access,
+        toDriveRole(existing.generalRole),
+        previousPermissionId
+      );
+      setShareState((prev) => {
+        const current = prev[fileId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [fileId]: {
+            ...current,
+            generalPermissionId: access === 'anyone' && result ? result.id : undefined,
+          },
+        };
+      });
+    } catch (error) {
+      setShareState((prev) => {
+        const current = prev[fileId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [fileId]: {
+            ...current,
+            generalAccess: previousAccess,
+            generalPermissionId: previousPermissionId,
+          },
+        };
+      });
+    }
+  };
+
+  const handleGeneralRoleChange = async (fileId: string, role: PersonRole) => {
+    const existing = shareState[fileId];
+    if (!existing) return;
+    const previousRole = existing.generalRole;
+
+    setShareState((prev) => {
+      const current = prev[fileId];
+      if (!current) return prev;
+      return { ...prev, [fileId]: { ...current, generalRole: role } };
+    });
+
+    try {
+      if (existing.generalPermissionId) {
+        await props.onChangeGeneralRole(fileId, existing.generalPermissionId, toDriveRole(role));
+      }
+    } catch (error) {
+      setShareState((prev) => {
+        const current = prev[fileId];
+        if (!current) return prev;
+        return { ...prev, [fileId]: { ...current, generalRole: previousRole } };
+      });
+    }
+  };
+
+  const handleCopyLink = (fileId: string) => {
+    const url = `https://drive.google.com/file/d/${fileId}/view`;
+    navigator.clipboard.writeText(url);
   };
 
   const getStatusText = (_key: string, state: FileSyncState | undefined): string => {
@@ -275,6 +570,15 @@ export function SettingsView(props: SettingsViewProps) {
                             <div className="file-status">
                               <span className="status-text">{statusText}</span>
                               <button
+                                className="share-button"
+                                onClick={() => state?.driveFileId && handleOpenShare(state.driveFileId)}
+                                disabled={!state?.driveFileId}
+                                title={!state?.driveFileId ? 'Sync this file first' : undefined}
+                                aria-label="Share settings"
+                              >
+                                <SettingsShareIcon />
+                              </button>
+                              <button
                                 className="sync-now-button"
                                 onClick={() => props.onSyncFilterRule(rule.id)}
                                 disabled={isDisabled}
@@ -366,6 +670,27 @@ export function SettingsView(props: SettingsViewProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {shareModalOpenFileId && shareState[shareModalOpenFileId] && (
+        <ShareModal
+          fileId={shareModalOpenFileId}
+          fileName={
+            props.filterRules.find(
+              (rule) => props.filterSyncState[rule.id]?.driveFileId === shareModalOpenFileId
+            )?.fileName || shareModalOpenFileId
+          }
+          token=""
+          state={shareState[shareModalOpenFileId]}
+          onLoad={() => handleOpenShare(shareModalOpenFileId)}
+          onInvite={(email) => handleInvite(shareModalOpenFileId, email)}
+          onRoleChange={(permissionId, role) => handleRoleChange(shareModalOpenFileId, permissionId, role)}
+          onRemove={(permissionId) => handleRemove(shareModalOpenFileId, permissionId)}
+          onGeneralAccessChange={(access) => handleGeneralAccessChange(shareModalOpenFileId, access)}
+          onGeneralRoleChange={(role) => handleGeneralRoleChange(shareModalOpenFileId, role)}
+          onCopyLink={() => handleCopyLink(shareModalOpenFileId)}
+          onClose={handleCloseShare}
+        />
       )}
     </div>
   );

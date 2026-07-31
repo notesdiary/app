@@ -14,6 +14,12 @@ describe('SettingsView', () => {
   const mockOnRemoveFilterRule = vi.fn();
   const mockOnSyncFilterRule = vi.fn();
   const mockOnBack = vi.fn();
+  const mockOnLoadSharePermissions = vi.fn().mockResolvedValue([]);
+  const mockOnInvitePerson = vi.fn();
+  const mockOnChangePersonRole = vi.fn();
+  const mockOnRemovePerson = vi.fn();
+  const mockOnChangeGeneralAccess = vi.fn();
+  const mockOnChangeGeneralRole = vi.fn();
 
   const defaultProps = {
     filterRules: [],
@@ -24,6 +30,12 @@ describe('SettingsView', () => {
     onUpdateFilterRule: mockOnUpdateFilterRule,
     onRemoveFilterRule: mockOnRemoveFilterRule,
     onSyncFilterRule: mockOnSyncFilterRule,
+    onLoadSharePermissions: mockOnLoadSharePermissions,
+    onInvitePerson: mockOnInvitePerson,
+    onChangePersonRole: mockOnChangePersonRole,
+    onRemovePerson: mockOnRemovePerson,
+    onChangeGeneralAccess: mockOnChangeGeneralAccess,
+    onChangeGeneralRole: mockOnChangeGeneralRole,
   };
 
   beforeEach(() => {
