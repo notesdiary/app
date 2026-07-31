@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Entry, FileSyncState, SyncMode, FilterRule } from './types';
+import { Entry, FileSyncState, FilterRule } from './types';
 import { getTodayISO } from './lib/dateUtils';
 import { deriveMode } from './lib/mode';
 import { filterEntries, filterParagraphsInEntry } from './lib/entryFiltering';
 import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries } from './lib/entriesRepo';
-import { getExtraDates, addExtraDate, getDriveMeta, setDriveMeta, getFileSyncState, setFileSyncState, getSyncMode, setSyncMode, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
+import { getExtraDates, addExtraDate, getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
 import { getAccessToken, requestAccessToken, revokeToken, getAuthStatus } from './lib/googleAuth';
-import { findOrCreateAppFolder, listBackupFiles, uploadMonthFile, downloadMonthFile, extractMonthFromFilename, uploadNamedFile, deleteFile, ensureJsonExtension } from './lib/driveApi';
+import { findOrCreateAppFolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent } from './lib/driveApi';
 import { useWindowWidth } from './hooks/useWindowWidth';
 import { LeftRail } from './components/LeftRail';
 import { RightRail } from './components/RightRail';
@@ -29,10 +29,8 @@ function App() {
   const [driveAccount, setDriveAccount] = useState<string | undefined>();
   const [driveFolderId, setDriveFolderId] = useState<string | undefined>();
   const [driveToken, setDriveToken] = useState<string | undefined>();
-  const [fileSyncState, setFileSyncStateLocal] = useState<Record<string, FileSyncState>>({});
 
-  // State: filter sync mode and rules
-  const [syncMode, setSyncModeLocal] = useState<SyncMode>('all');
+  // State: filter sync rules
   const [filterRules, setFilterRulesLocal] = useState<FilterRule[]>([]);
   const [filterSyncState, setFilterSyncStateLocal] = useState<Record<string, FileSyncState>>({});
 
@@ -73,19 +71,19 @@ function App() {
       if (driveMeta.driveAccount) setDriveAccount(driveMeta.driveAccount);
       if (driveMeta.driveFolderId) setDriveFolderId(driveMeta.driveFolderId);
 
-      // Load file sync state (for months)
-      const syncState = await getFileSyncState();
-      setFileSyncStateLocal(syncState);
-
-      // Load filter sync mode and rules
-      const mode = await getSyncMode();
-      setSyncModeLocal(mode);
-
-      const rules = await getFilterRules();
-      setFilterRulesLocal(rules);
-
+      // Load filter rules and sync state
+      let rules = await getFilterRules();
       const filterSync = await getFilterSyncState();
       setFilterSyncStateLocal(filterSync);
+
+      // Auto-seed: if no rules exist, create a default remainder rule
+      if (rules.length === 0) {
+        const seeded = [{ id: 'fr-' + crypto.randomUUID(), filter: '', fileName: 'notesdiary-backup.json', isRemainder: true }];
+        setFilterRulesLocal(seeded);
+        await setFilterRules(seeded);
+      } else {
+        setFilterRulesLocal(rules);
+      }
     })();
   }, []);
 
@@ -110,7 +108,7 @@ function App() {
     }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(intervalId);
-  }, [driveConnected, syncMode, filterRules, fileSyncState]);
+  }, [driveConnected, filterRules]);
 
   // Verify and maintain Drive connection, attempt silent reconnect if needed
   useEffect(() => {
@@ -138,20 +136,6 @@ function App() {
 
   // Filter entries based on current mode and filters
   const filteredEntries = filterEntries(entries, mode, selectedDate, selectedTags, searchQuery);
-
-  // Mode switching (non-destructive)
-  const setSyncModeAll = async () => {
-    setSyncModeLocal('all');
-    await setSyncMode('all');
-  };
-
-  const setSyncModeFilters = async () => {
-    const rules = filterRules.length ? filterRules : [{ id: 'fr-' + crypto.randomUUID(), filter: '', fileName: '', isRemainder: false }];
-    setFilterRulesLocal(rules);
-    setSyncModeLocal('filters');
-    await setSyncMode('filters');
-    await setFilterRules(rules);
-  };
 
   // Rule CRUD (local + persisted, no Drive calls)
   const addFilterRule = async () => {
@@ -409,68 +393,6 @@ function App() {
     return folderId;
   };
 
-  const syncMonth = async (monthKey: string, driveFileIdOverride?: string) => {
-    setFileSyncStateLocal(prev => ({
-      ...prev,
-      [monthKey]: { ...prev[monthKey], status: 'syncing' },
-    }));
-
-    try {
-      // Get a valid access token (refreshes if needed)
-      const token = await getAccessToken();
-      const driveFolderId = await ensureDriveFolderId(token);
-
-      // Get local entries for this month (active entries only)
-      const localEntries = entries.filter(
-        e => e.date.startsWith(monthKey) && !e.archived
-      );
-
-      // Get Drive file ID if sync was previously attempted. An override may
-      // be passed in when the caller just ran discovery in this same call
-      // chain — React state from that discovery hasn't re-rendered yet, so
-      // fileSyncState here would otherwise still be stale.
-      const driveFileId = driveFileIdOverride ?? fileSyncState[monthKey]?.driveFileId;
-      let driveFileIdForState = driveFileId;
-
-      // Sync strategy: merge local + remote (local wins on ID collision)
-      if (driveFileId) {
-        // File exists on Drive — fetch remote, merge, and upload
-        const remoteEntries = await downloadMonthFile(token, driveFileId);
-        const remoteOnly = remoteEntries.filter(r => !localEntries.find(l => l.id === r.id));
-        const merged = localEntries.concat(remoteOnly);
-
-        // Persist remote-only entries locally so they appear in the app
-        if (remoteOnly.length > 0) {
-          await putEntries(remoteOnly);
-          setEntries(prev => prev.concat(remoteOnly.filter(r => !prev.find(l => l.id === r.id))));
-        }
-
-        await uploadMonthFile(token, driveFolderId, monthKey, merged, driveFileId);
-      } else {
-        // No remote file yet — create one with local entries
-        const fileId = await uploadMonthFile(token, driveFolderId, monthKey, localEntries);
-        driveFileIdForState = fileId;
-      }
-
-      // Mark as synced with timestamp
-      const nextFileSyncState = {
-        ...fileSyncState,
-        [monthKey]: {
-          status: 'synced' as const,
-          lastSynced: Date.now(),
-          driveFileId: driveFileIdForState,
-        },
-      };
-      setFileSyncStateLocal(nextFileSyncState);
-
-      // Persist sync state
-      await setFileSyncState(nextFileSyncState);
-    } catch (error) {
-      console.error(`Failed to sync month ${monthKey}:`, error);
-      // Leave status as 'pending' or 'syncing' — user can retry
-    }
-  };
-
   const syncFilterRule = async (id: string) => {
     // Look up rule; bail if not found
     const rule = filterRules.find(r => r.id === id);
@@ -510,7 +432,8 @@ function App() {
 
       if (driveFileId) {
         // File exists on Drive — union local with remote (local wins on id collision)
-        const remoteEntries = await downloadMonthFile(token, driveFileId);
+        const remoteContent = await downloadFileContent(token, driveFileId);
+        const remoteEntries: Entry[] = Array.isArray(remoteContent) ? remoteContent : [];
         const remoteOnly = remoteEntries.filter(r => !localMatches.find(l => l.id === r.id));
         const merged = localMatches.concat(remoteOnly);
 
@@ -546,17 +469,6 @@ function App() {
     }
   };
 
-  const syncAllMonths = async () => {
-    // Re-discover first: months that exist only in Drive (created on another
-    // device, or added since the last discovery) aren't in fileSyncState yet
-    // and would otherwise never be picked up for syncing.
-    const token = await getAccessToken();
-    const discovered = await handleDiscoverDriveFolder(token);
-    const stateToUse = discovered ?? fileSyncState;
-    const monthKeys = Object.keys(stateToUse);
-    await Promise.all(monthKeys.map(key => syncMonth(key, stateToUse[key]?.driveFileId)));
-  };
-
   const syncAllFilters = async () => {
     const dup = getDuplicateFilenameRuleIds(filterRules);
     const runnable = filterRules.filter(r => !isRuleSkippable(r) && !dup.has(r.id));
@@ -564,49 +476,58 @@ function App() {
   };
 
   const syncAllNow = async () => {
-    if (syncMode === 'filters') {
-      await syncAllFilters();
-    } else {
-      await syncAllMonths();
-    }
+    await syncAllFilters();
   };
 
-  const handleDiscoverDriveFolder = async (token: string): Promise<Record<string, FileSyncState> | undefined> => {
+  const handleDiscoverDriveFolder = async (token: string) => {
     try {
       const folderId = await findOrCreateAppFolder(token);
       setDriveFolderId(folderId);
       await setDriveMeta({ driveFolderId: folderId });
 
       const files = await listBackupFiles(token, folderId);
-      const fileMonthKeys = new Set(
-        files.map(f => extractMonthFromFilename(f.name)).filter((m): m is string => m !== null)
-      );
-      const localMonthKeys = new Set(entries.map(e => e.date.slice(0, 7)));
 
-      const newSyncState: Record<string, FileSyncState> = {};
-      const localMonthKeysArray = Array.from(localMonthKeys) as string[];
-      const fileMonthKeysArray = Array.from(fileMonthKeys) as string[];
+      // Build a map of fileName -> file for quick lookup
+      const fileMap = new Map(files.map(f => [f.name, f]));
 
-      for (const monthKey of localMonthKeysArray) {
-        const driveFileId = files.find((f: any) => {
-          const mKey = extractMonthFromFilename(f.name);
-          return mKey === monthKey;
-        })?.id;
-        newSyncState[monthKey] = { status: 'pending', driveFileId };
-      }
-      for (const monthKey of fileMonthKeysArray) {
-        if (!localMonthKeys.has(monthKey)) {
-          const driveFileId = files.find((f: any) => {
-            const mKey = extractMonthFromFilename(f.name);
-            return mKey === monthKey;
-          })?.id;
-          newSyncState[monthKey] = { status: 'remote-pending', driveFileId };
+      // Process each filter rule
+      const updatedFilterSyncState = { ...filterSyncState };
+
+      for (const rule of filterRules) {
+        const fileName = ensureJsonExtension(rule.fileName);
+        const file = fileMap.get(fileName);
+
+        // If file exists on Drive and we don't have its driveFileId yet, download it
+        if (file && !filterSyncState[rule.id]?.driveFileId) {
+          try {
+            const remoteContent = await downloadFileContent(token, file.id);
+            const remoteEntries: Entry[] = Array.isArray(remoteContent) ? remoteContent : [];
+
+            // Merge: union-by-id, local-wins on collision
+            const localIds = new Set(entries.map(e => e.id));
+            const entriesToAdd = remoteEntries.filter(r => !localIds.has(r.id));
+
+            // Persist remote-only entries locally
+            if (entriesToAdd.length > 0) {
+              await putEntries(entriesToAdd);
+              setEntries(prev => prev.concat(entriesToAdd.filter(r => !prev.find(l => l.id === r.id))));
+            }
+
+            // Record the driveFileId in filterSyncState
+            updatedFilterSyncState[rule.id] = {
+              status: 'synced' as const,
+              lastSynced: Date.now(),
+              driveFileId: file.id,
+            };
+          } catch (error) {
+            console.error(`Failed to download file for rule ${rule.id}:`, error);
+          }
         }
       }
 
-      setFileSyncStateLocal(newSyncState);
-      await setFileSyncState(newSyncState);
-      return newSyncState;
+      // Persist the updated filterSyncState
+      setFilterSyncStateLocal(updatedFilterSyncState);
+      await setFilterSyncState(updatedFilterSyncState);
     } catch (error) {
       console.error('Failed to discover Drive folder:', error);
     }
@@ -659,20 +580,10 @@ function App() {
     }
   };
 
-  const disconnectDrive = async (deleteLocal: boolean) => {
+  const disconnectDrive = async () => {
     try {
       if (driveToken) {
         await revokeToken(driveToken);
-      }
-
-      if (deleteLocal) {
-        // Delete all entries in months with ANY sync state
-        const monthKeysToDelete = new Set(Object.keys(fileSyncState));
-        const remainingEntries = entries.filter(
-          e => !monthKeysToDelete.has(e.date.slice(0, 7))
-        );
-        setEntries(remainingEntries);
-        // Note: actual deletion from IndexedDB should be done here if needed
       }
 
       // Clear connection state
@@ -680,11 +591,17 @@ function App() {
       setDriveAccount(undefined);
       setDriveFolderId(undefined);
       setDriveToken(undefined);
-      setFileSyncStateLocal({});
+
+      // Clear Drive file IDs from filterSyncState
+      const clearedFilterSyncState: Record<string, FileSyncState> = {};
+      for (const [ruleId, syncState] of Object.entries(filterSyncState)) {
+        clearedFilterSyncState[ruleId] = { ...syncState, driveFileId: undefined };
+      }
+      setFilterSyncStateLocal(clearedFilterSyncState);
 
       // Save to storage
       await setDriveMeta({ driveConnected: false });
-      await setFileSyncState({});
+      await setFilterSyncState(clearedFilterSyncState);
     } catch (error) {
       console.error('Failed to disconnect Drive:', error);
     }
@@ -738,17 +655,12 @@ function App() {
           <SettingsView
             driveConnected={driveConnected}
             driveAccount={driveAccount}
-            fileSyncState={fileSyncState}
-            syncMode={syncMode}
             filterRules={filterRules}
             filterSyncState={filterSyncState}
             filterMatchCounts={Object.fromEntries(filterRules.map(r => [r.id, getFilterMatches(r, entries).length]))}
-            monthMatchCounts={Object.fromEntries(Object.keys(fileSyncState).map(monthKey => [monthKey, entries.filter(e => e.date.startsWith(monthKey) && !e.archived).length]))}
             onConnectDrive={connectDrive}
             onDisconnectDrive={disconnectDrive}
             onSyncAllNow={syncAllNow}
-            onSetSyncModeAll={setSyncModeAll}
-            onSetSyncModeFilters={setSyncModeFilters}
             onAddFilterRule={addFilterRule}
             onAddRemainderRule={addRemainderRule}
             onUpdateFilterRule={updateFilterRule}

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../App';
 import { getDB } from '../lib/db';
-import { setDriveMeta, setSyncMode, setFilterRules } from '../lib/metaRepo';
+import { setDriveMeta, setFilterRules } from '../lib/metaRepo';
 
 vi.mock('../lib/googleAuth', () => ({
   getAccessToken: vi.fn(async () => 'fake-token'),
@@ -17,8 +17,6 @@ vi.mock('../lib/driveApi', async () => {
     findOrCreateAppFolder: vi.fn(async () => 'rediscovered-folder-id'),
     listBackupFiles: vi.fn(async () => []),
     uploadNamedFile: vi.fn(async () => 'uploaded-file-id'),
-    uploadMonthFile: vi.fn(async () => 'uploaded-month-id'),
-    downloadMonthFile: vi.fn(async () => []),
   };
 });
 
@@ -42,7 +40,6 @@ describe('Drive folder ID self-heal', () => {
 
     // Simulate the broken persisted state: connected, no folder ID on disk.
     await setDriveMeta({ driveConnected: true, driveAccount: 'user@example.com' });
-    await setSyncMode('filters');
     await setFilterRules([
       { id: 'fr-1', filter: 'work', fileName: 'work.json', isRemainder: false },
     ]);

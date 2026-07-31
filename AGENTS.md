@@ -118,12 +118,14 @@ Tags are derived at render time (never persisted):
 
 ### Google Drive Integration
 
-Optional one-way sync:
-1. User connects via OAuth (Google Identity Services)
-2. Backups stored as JSON files, one per month (e.g., "July 2026.json")
-3. Manual "Sync now" or "Sync all now" buttons
-4. Per-month sync status tracked in `meta` store
-5. Basic merge: union by entry ID, local wins on conflict
+Filter-mode-only sync:
+1. User connects via OAuth (Google Identity Services) with no backup mode selection
+2. Backups stored per filter rule (user-named files) + auto-seeded remainder rule (`notesdiary-backup.json`)
+3. Per-rule "Sync now" + "Sync filters now" button to sync all rules at once
+4. Per-rule sync status tracked in `meta` store via `filter-sync-state` and `filter-rules` keys
+5. Merge: union by entry ID, local wins on conflict
+6. New users auto-seeded with default remainder rule (no manual setup required)
+7. Legacy month-based files (e.g., "July 2026.json") left untouched in Drive
 
 ## Implementation Plan
 

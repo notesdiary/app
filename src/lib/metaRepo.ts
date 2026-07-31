@@ -1,10 +1,8 @@
-import { DriveMeta, FileSyncState, SyncMode, FilterRule } from '../types';
+import { DriveMeta, FileSyncState, FilterRule } from '../types';
 import { getDB } from './db';
 
 const EXTRA_DATES_KEY = 'extra-dates';
 const DRIVE_META_KEY = 'drive-meta';
-const FILE_SYNC_STATE_KEY = 'file-sync-state';
-const SYNC_MODE_KEY = 'sync-mode';
 const FILTER_RULES_KEY = 'filter-rules';
 const FILTER_SYNC_STATE_KEY = 'filter-sync-state';
 
@@ -33,28 +31,6 @@ export async function setDriveMeta(meta: Partial<DriveMeta>): Promise<void> {
   const db = await getDB();
   const existing = await getDriveMeta();
   await db.put('meta', { ...existing, ...meta }, DRIVE_META_KEY);
-}
-
-export async function getFileSyncState(): Promise<Record<string, FileSyncState>> {
-  const db = await getDB();
-  const state = await db.get('meta', FILE_SYNC_STATE_KEY);
-  return (state as Record<string, FileSyncState>) || {};
-}
-
-export async function setFileSyncState(state: Record<string, FileSyncState>): Promise<void> {
-  const db = await getDB();
-  await db.put('meta', state, FILE_SYNC_STATE_KEY);
-}
-
-export async function getSyncMode(): Promise<SyncMode> {
-  const db = await getDB();
-  const mode = await db.get('meta', SYNC_MODE_KEY);
-  return (mode as SyncMode) || 'all';
-}
-
-export async function setSyncMode(mode: SyncMode): Promise<void> {
-  const db = await getDB();
-  await db.put('meta', mode, SYNC_MODE_KEY);
 }
 
 export async function getFilterRules(): Promise<FilterRule[]> {

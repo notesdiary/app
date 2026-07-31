@@ -1,21 +1,16 @@
 import { useState } from 'react';
-import { FileSyncState, SyncMode, FilterRule } from '../types';
+import { FileSyncState, FilterRule } from '../types';
 import './SettingsView.css';
 
 interface SettingsViewProps {
   driveConnected: boolean;
   driveAccount?: string;
-  fileSyncState: Record<string, FileSyncState>;
-  syncMode: SyncMode;
   filterRules: FilterRule[];
   filterSyncState: Record<string, FileSyncState>;
   filterMatchCounts: Record<string, number>;
-  monthMatchCounts: Record<string, number>;
   onConnectDrive: () => Promise<void>;
   onDisconnectDrive: (deleteLocal: boolean) => Promise<void>;
   onSyncAllNow: () => Promise<void>;
-  onSetSyncModeAll: () => Promise<void>;
-  onSetSyncModeFilters: () => Promise<void>;
   onAddFilterRule: () => Promise<void>;
   onAddRemainderRule: () => Promise<void>;
   onUpdateFilterRule: (id: string, field: 'filter' | 'fileName', value: string) => Promise<void>;
@@ -55,7 +50,6 @@ export function SettingsView(props: SettingsViewProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | undefined>(undefined);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
-  const [syncingMonths, setSyncingMonths] = useState<Set<string>>(new Set());
   const [pendingRemoveRuleId, setPendingRemoveRuleId] = useState<string | null>(null);
 
   const handleConnectClick = async () => {
@@ -88,7 +82,7 @@ export function SettingsView(props: SettingsViewProps) {
     setPendingRemoveRuleId(null);
   };
 
-  const getStatusText = (monthKey: string, state: FileSyncState | undefined): string => {
+  const getStatusText = (_key: string, state: FileSyncState | undefined): string => {
     if (!state) return '';
     if (state.status === 'syncing') return 'Syncing…';
     if (state.status === 'remote-pending')
@@ -110,20 +104,6 @@ export function SettingsView(props: SettingsViewProps) {
     if (state.status === 'pending') return 'Not yet synced';
     return '';
   };
-
-  const getMonthName = (monthKey: string): string => {
-    try {
-      return new Date(monthKey + '-01').toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric',
-      });
-    } catch {
-      return monthKey;
-    }
-  };
-
-  const monthKeys = Object.keys(props.fileSyncState).sort().reverse();
-  const totalEntries = Object.values(props.fileSyncState).length;
 
   return (
     <div className="settings-view">
@@ -153,8 +133,7 @@ export function SettingsView(props: SettingsViewProps) {
               </button>
 
               <p className="connect-explanation">
-                While connected, I keep one backup file per month in Drive and sync automatically.
-                If you edit a file directly in Drive, I pick up those changes the next time I sync.
+                While connected, entries matching your filters get backed up to their own file in Drive, and sync automatically. If you edit a file directly in Drive, I pick up those changes the next time I sync.
               </p>
 
               {connectError && (
@@ -178,197 +157,138 @@ export function SettingsView(props: SettingsViewProps) {
                 Disconnect
               </button>
 
-              {/* Mode toggle buttons (6.2) */}
-              <div className="sync-mode-row">
-                <button
-                  className={`sync-mode-button ${props.syncMode === 'all' ? 'sync-mode-button-active' : ''}`}
-                  onClick={props.onSetSyncModeAll}
-                >
-                  Sync all
-                </button>
-                <button
-                  className={`sync-mode-button ${props.syncMode === 'filters' ? 'sync-mode-button-active' : ''}`}
-                  onClick={props.onSetSyncModeFilters}
-                >
-                  Sync with filters
-                </button>
-              </div>
+              {/* Filter sync mode UI */}
+              <>
+                {/* Explanatory copy */}
+                <div className="filter-mode-section">
+                  <p className="filter-mode-explanation">
+                    Only entries matching a filter get backed up, each rule to its own file. Everything else stays local.
+                  </p>
 
-              {/* Sync all mode: month-based backup files (6.7) */}
-              {props.syncMode === 'all' && totalEntries > 0 && (
-                <div className="backup-files-section">
-                  <h3 className="backup-files-title">Backup files</h3>
-                  <div className="backup-files-list">
-                    {monthKeys.map(monthKey => {
-                      const state = props.fileSyncState[monthKey];
-                      if (!state) return null;
-                      const statusText = getStatusText(monthKey, state);
-                      const isSyncing = state.status === 'syncing';
-
-                      let statusDotColor = '#999';
-                      if (state.status === 'pending') statusDotColor = '#FF8200';
-                      if (state.status === 'remote-pending') statusDotColor = '#00A9CE';
-                      if (state.status === 'synced') statusDotColor = '#00A9CE';
+                  {/* Filter rule editor */}
+                  <div className="filter-rule-editor">
+                    {props.filterRules.map((rule) => {
+                      const duplicates = getDuplicateFilenameRuleIds(props.filterRules);
+                      const isDuplicate = duplicates.has(rule.id);
+                      const filename = ensureJsonExtension(rule.fileName);
 
                       return (
-                        <div key={monthKey} className="backup-file-row">
-                          <div className="file-info">
-                            <span
-                              className="status-dot"
-                              style={{ backgroundColor: statusDotColor }}
-                            />
-                            <div className="file-details">
-                              <span className="file-name">{getMonthName(monthKey)}.json</span>
-                              <span className="file-meta">
-                                {props.monthMatchCounts[monthKey] || 0} entry
-                                {(props.monthMatchCounts[monthKey] || 0) !== 1 ? 's' : ''}
-                              </span>
+                        <div key={rule.id} className="filter-rule-row">
+                          {rule.isRemainder ? (
+                            <div className="filter-rule-remainder-box">
+                              Everything else
                             </div>
+                          ) : (
+                            <input
+                              type="text"
+                              className="filter-rule-input"
+                              placeholder="Filter, e.g. #project-atlas"
+                              value={rule.filter}
+                              onChange={(e) => props.onUpdateFilterRule(rule.id, 'filter', e.target.value)}
+                            />
+                          )}
+
+                          <span className="filter-rule-separator">→</span>
+
+                          <div className="filter-rule-filename-wrapper">
+                            <input
+                              type="text"
+                              className="filter-rule-input"
+                              placeholder="filename.json"
+                              value={rule.fileName}
+                              onChange={(e) => props.onUpdateFilterRule(rule.id, 'fileName', e.target.value)}
+                            />
+                            {isDuplicate && (
+                              <p className="filename-error">
+                                This filename is used by another rule — pick a unique name.
+                              </p>
+                            )}
                           </div>
-                          <div className="file-status">
-                            <span className="status-text">{statusText}</span>
-                          </div>
+
+                          <button
+                            className="filter-rule-remove-button"
+                            onClick={() => setPendingRemoveRuleId(rule.id)}
+                          >
+                            Remove
+                          </button>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Add buttons */}
+                  <div className="add-filter-row">
+                    <button
+                      className="add-filter-button"
+                      onClick={props.onAddFilterRule}
+                    >
+                      + Add filter
+                    </button>
+                    {!props.filterRules.some(r => r.isRemainder) && (
+                      <button
+                        className="add-remainder-button"
+                        onClick={props.onAddRemainderRule}
+                      >
+                        + Add "everything else" filter
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              {/* Filter sync mode UI (6.3, 6.4, 6.5, 6.7) */}
-              {props.syncMode === 'filters' && (
-                <>
-                  {/* Explanatory copy (6.3) */}
-                  <div className="filter-mode-section">
-                    <p className="filter-mode-explanation">
-                      Only entries matching a filter get backed up, each rule to its own file. Everything else stays local.
-                    </p>
-
-                    {/* Filter rule editor (6.3) */}
-                    <div className="filter-rule-editor">
+                {/* Filter-mode backup files list */}
+                {props.filterRules.filter(r => !r.isRemainder || props.filterRules.some(x => x.isRemainder)).length > 0 && (
+                  <div className="backup-files-section">
+                    <h3 className="backup-files-title">Backup files</h3>
+                    <div className="backup-files-list">
                       {props.filterRules.map((rule) => {
+                        const state = props.filterSyncState[rule.id];
+                        const statusText = getStatusText(rule.id, state);
+                        const isSyncing = state?.status === 'syncing';
                         const duplicates = getDuplicateFilenameRuleIds(props.filterRules);
                         const isDuplicate = duplicates.has(rule.id);
-                        const filename = ensureJsonExtension(rule.fileName);
+                        const isSkippable = !rule.fileName.trim();
+
+                        let statusDotColor = '#999';
+                        if (state?.status === 'pending') statusDotColor = '#FF8200';
+                        if (state?.status === 'remote-pending') statusDotColor = '#00A9CE';
+                        if (state?.status === 'synced') statusDotColor = '#00A9CE';
+
+                        const isDisabled = isSyncing || isDuplicate || isSkippable;
 
                         return (
-                          <div key={rule.id} className="filter-rule-row">
-                            {rule.isRemainder ? (
-                              <div className="filter-rule-remainder-box">
-                                Everything else
+                          <div key={rule.id} className="backup-file-row">
+                            <div className="file-info">
+                              <span
+                                className="status-dot"
+                                style={{ backgroundColor: statusDotColor }}
+                              />
+                              <div className="file-details">
+                                <span className="file-name">
+                                  {ensureJsonExtension(rule.fileName) || 'untitled.json'}
+                                </span>
+                                <span className="file-meta">
+                                  {props.filterMatchCounts[rule.id] || 0} entry
+                                  {(props.filterMatchCounts[rule.id] || 0) !== 1 ? 's' : ''}
+                                </span>
                               </div>
-                            ) : (
-                              <input
-                                type="text"
-                                className="filter-rule-input"
-                                placeholder="Filter, e.g. #project-atlas"
-                                value={rule.filter}
-                                onChange={(e) => props.onUpdateFilterRule(rule.id, 'filter', e.target.value)}
-                              />
-                            )}
-
-                            <span className="filter-rule-separator">→</span>
-
-                            <div className="filter-rule-filename-wrapper">
-                              <input
-                                type="text"
-                                className="filter-rule-input"
-                                placeholder="filename.json"
-                                value={rule.fileName}
-                                onChange={(e) => props.onUpdateFilterRule(rule.id, 'fileName', e.target.value)}
-                              />
-                              {isDuplicate && (
-                                <p className="filename-error">
-                                  This filename is used by another rule — pick a unique name.
-                                </p>
-                              )}
                             </div>
-
-                            <button
-                              className="filter-rule-remove-button"
-                              onClick={() => setPendingRemoveRuleId(rule.id)}
-                            >
-                              Remove
-                            </button>
+                            <div className="file-status">
+                              <span className="status-text">{statusText}</span>
+                              <button
+                                className="sync-now-button"
+                                onClick={() => props.onSyncFilterRule(rule.id)}
+                                disabled={isDisabled}
+                              >
+                                Sync now
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-
-                    {/* Add buttons (6.3) */}
-                    <div className="add-filter-row">
-                      <button
-                        className="add-filter-button"
-                        onClick={props.onAddFilterRule}
-                      >
-                        + Add filter
-                      </button>
-                      {props.filterRules.length > 0 && !props.filterRules.some(r => r.isRemainder) && (
-                        <button
-                          className="add-remainder-button"
-                          onClick={props.onAddRemainderRule}
-                        >
-                          + Add "everything else" filter
-                        </button>
-                      )}
-                    </div>
                   </div>
-
-                  {/* Filter-mode backup files list (6.5) */}
-                  {props.filterRules.filter(r => !r.isRemainder || props.filterRules.some(x => x.isRemainder)).length > 0 && (
-                    <div className="backup-files-section">
-                      <h3 className="backup-files-title">Backup files</h3>
-                      <div className="backup-files-list">
-                        {props.filterRules.map((rule) => {
-                          const state = props.filterSyncState[rule.id];
-                          const statusText = getStatusText(rule.id, state);
-                          const isSyncing = state?.status === 'syncing';
-                          const duplicates = getDuplicateFilenameRuleIds(props.filterRules);
-                          const isDuplicate = duplicates.has(rule.id);
-                          const isSkippable = !rule.fileName.trim();
-
-                          let statusDotColor = '#999';
-                          if (state?.status === 'pending') statusDotColor = '#FF8200';
-                          if (state?.status === 'remote-pending') statusDotColor = '#00A9CE';
-                          if (state?.status === 'synced') statusDotColor = '#00A9CE';
-
-                          const isDisabled = isSyncing || isDuplicate || isSkippable;
-
-                          return (
-                            <div key={rule.id} className="backup-file-row">
-                              <div className="file-info">
-                                <span
-                                  className="status-dot"
-                                  style={{ backgroundColor: statusDotColor }}
-                                />
-                                <div className="file-details">
-                                  <span className="file-name">
-                                    {ensureJsonExtension(rule.fileName) || 'untitled.json'}
-                                  </span>
-                                  <span className="file-meta">
-                                    {props.filterMatchCounts[rule.id] || 0} entry
-                                    {(props.filterMatchCounts[rule.id] || 0) !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              </div>
-                              <div className="file-status">
-                                <span className="status-text">{statusText}</span>
-                                <button
-                                  className="sync-now-button"
-                                  onClick={() => props.onSyncFilterRule(rule.id)}
-                                  disabled={isDisabled}
-                                >
-                                  Sync now
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+                )}
+              </>
 
               {/* Remove filter rule modal (6.4) */}
               {pendingRemoveRuleId && (
@@ -406,7 +326,7 @@ export function SettingsView(props: SettingsViewProps) {
 
               <div className="sync-footer">
                 <button className="sync-all-button" onClick={handleSyncAllNow}>
-                  {props.syncMode === 'filters' ? 'Sync filters now' : 'Sync all now'}
+                  Sync filters now
                 </button>
               </div>
             </div>

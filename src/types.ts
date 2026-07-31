@@ -9,8 +9,6 @@ export type Entry = {
 
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'remote-pending';
 
-export type SyncMode = 'all' | 'filters';
-
 export type FilterRule = {
   id: string;
   filter: string;

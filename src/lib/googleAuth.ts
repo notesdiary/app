@@ -13,6 +13,7 @@ interface TokenData {
 let tokenClient: any;
 let tokenResolve: ((token: string) => void) | null = null;
 let tokenReject: ((error: Error) => void) | null = null;
+let inFlightTokenPromise: Promise<string> | null = null;
 const TOKEN_STORAGE_KEY = 'notes_diary_oauth_token';
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;  // Refresh 5 min before expiry
 
@@ -82,8 +83,17 @@ export async function getAccessToken(): Promise<string> {
     return cached.access_token;
   }
 
-  // No valid cached token — request a new one
-  return requestAccessToken();
+  // No valid cached token — request a new one. Coalesce concurrent callers
+  // (e.g. multiple filter rules syncing at once) onto a single OAuth request
+  // instead of each triggering its own token flow.
+  if (inFlightTokenPromise) {
+    return inFlightTokenPromise;
+  }
+
+  inFlightTokenPromise = requestAccessToken().finally(() => {
+    inFlightTokenPromise = null;
+  });
+  return inFlightTokenPromise;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Entry, FileSyncState, DriveMeta } from '../types';
+import { Entry, DriveMeta } from '../types';
 
 // Using any for schema due to idb type definition strictness
 type NotesDiaryDB = any;

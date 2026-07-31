@@ -91,23 +91,6 @@ async function uploadFileContent(
   }
 }
 
-export async function uploadMonthFile(
-  token: string,
-  folderId: string,
-  monthKey: string,
-  entries: Entry[],
-  existingFileId?: string
-): Promise<string> {
-  // Format month name: "July 2026"
-  const monthName = new Date(monthKey + '-01').toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-  const filename = `${monthName}.json`;
-
-  return uploadFileContent(token, folderId, filename, entries, existingFileId);
-}
-
 export async function uploadNamedFile(
   token: string,
   folderId: string,
@@ -119,18 +102,22 @@ export async function uploadNamedFile(
   return uploadFileContent(token, folderId, filename, entries, existingFileId);
 }
 
-export async function downloadMonthFile(token: string, fileId: string): Promise<Entry[]> {
+export async function downloadFileContent(
+  token: string,
+  fileId: string
+): Promise<any> {
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    { headers: { 'Authorization': `Bearer ${token}` } }
+    {
+      headers: { 'Authorization': `Bearer ${token}` },
+    }
   );
 
   if (!response.ok) {
     throw new Error(`Failed to download file: ${response.statusText}`);
   }
 
-  const data = await response.json();
-  return data;
+  return response.json();
 }
 
 export async function deleteFile(token: string, fileId: string): Promise<void> {
@@ -147,31 +134,3 @@ export async function deleteFile(token: string, fileId: string): Promise<void> {
   }
 }
 
-export function extractMonthFromFilename(filename: string): string | null {
-  // Extract month key from filename like "July 2026.json" -> "2026-07"
-  const match = filename.match(/^(\w+)\s+(\d{4})\.json$/);
-  if (!match) return null;
-
-  const monthName = match[1];
-  const year = match[2];
-
-  const monthMap: Record<string, string> = {
-    January: '01',
-    February: '02',
-    March: '03',
-    April: '04',
-    May: '05',
-    June: '06',
-    July: '07',
-    August: '08',
-    September: '09',
-    October: '10',
-    November: '11',
-    December: '12',
-  };
-
-  const month = monthMap[monthName];
-  if (!month) return null;
-
-  return `${year}-${month}`;
-}

@@ -8,8 +8,6 @@ describe('SettingsView', () => {
   const mockOnConnectDrive = vi.fn();
   const mockOnDisconnectDrive = vi.fn();
   const mockOnSyncAllNow = vi.fn();
-  const mockOnSetSyncModeAll = vi.fn();
-  const mockOnSetSyncModeFilters = vi.fn();
   const mockOnAddFilterRule = vi.fn();
   const mockOnAddRemainderRule = vi.fn();
   const mockOnUpdateFilterRule = vi.fn();
@@ -18,13 +16,9 @@ describe('SettingsView', () => {
   const mockOnBack = vi.fn();
 
   const defaultProps = {
-    syncMode: 'all' as const,
     filterRules: [],
     filterSyncState: {},
     filterMatchCounts: {},
-    monthMatchCounts: {},
-    onSetSyncModeAll: mockOnSetSyncModeAll,
-    onSetSyncModeFilters: mockOnSetSyncModeFilters,
     onAddFilterRule: mockOnAddFilterRule,
     onAddRemainderRule: mockOnAddRemainderRule,
     onUpdateFilterRule: mockOnUpdateFilterRule,
@@ -42,7 +36,6 @@ describe('SettingsView', () => {
         <SettingsView
             {...defaultProps}
           driveConnected={false}
-          fileSyncState={{}}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -52,10 +45,7 @@ describe('SettingsView', () => {
 
       expect(screen.getByText('Connect Google Drive')).toBeInTheDocument();
       expect(
-        screen.getByText((content, element) => {
-          return element?.classList.contains('connect-explanation') &&
-            content.includes('While connected, I keep one backup file per month in Drive');
-        })
+        screen.getByText(/entries matching your filters get backed up/)
       ).toBeInTheDocument();
     });
 
@@ -66,7 +56,6 @@ describe('SettingsView', () => {
         <SettingsView
             {...defaultProps}
           driveConnected={false}
-          fileSyncState={{}}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -90,7 +79,6 @@ describe('SettingsView', () => {
         <SettingsView
             {...defaultProps}
           driveConnected={false}
-          fileSyncState={{}}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -113,7 +101,6 @@ describe('SettingsView', () => {
         <SettingsView
             {...defaultProps}
           driveConnected={false}
-          fileSyncState={{}}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -157,8 +144,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -177,8 +162,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -189,14 +172,12 @@ describe('SettingsView', () => {
       expect(screen.getByText('Disconnect')).toBeInTheDocument();
     });
 
-    it('should render backup files list with correct month names', () => {
-      const { container } = render(
+    it('should render filter rule editor when connected', () => {
+      render(
         <SettingsView
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -204,21 +185,28 @@ describe('SettingsView', () => {
         />
       );
 
-      const backupFileRows = container.querySelectorAll('.backup-file-row');
-      expect(backupFileRows.length).toBe(3);
-
-      const rowTexts = Array.from(backupFileRows).map(row => row.textContent);
-      expect(rowTexts.some(text => text?.includes('2026'))).toBe(true);
+      expect(screen.getByText('+ Add filter')).toBeInTheDocument();
+      expect(screen.getByText(/Only entries matching a filter get backed up/)).toBeInTheDocument();
     });
 
-    it('should render correct sync status dots', () => {
+    it('should render status dots for filter rules with sync state', () => {
+      const rule: FilterRule = {
+        id: 'rule-1',
+        filter: '#test',
+        fileName: 'test',
+        isRemainder: false,
+      };
+
       const { container } = render(
         <SettingsView
             {...defaultProps}
+            filterRules={[rule]}
+            filterSyncState={{
+              'rule-1': { status: 'pending' },
+            }}
+            filterMatchCounts={{ 'rule-1': 5 }}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -227,29 +215,43 @@ describe('SettingsView', () => {
       );
 
       const dots = container.querySelectorAll('.status-dot');
-      expect(dots.length).toBe(3);
+      expect(dots.length).toBeGreaterThan(0);
 
-      // Check colors
+      // Check for pending status dot (orange)
       const dotArray = Array.from(dots);
       const pendingDot = dotArray.find(
         d => (d as HTMLElement).style.backgroundColor === 'rgb(255, 130, 0)'
       );
-      const remotePendingDot = dotArray.find(
-        d => (d as HTMLElement).style.backgroundColor === 'rgb(0, 169, 206)'
-      );
 
       expect(pendingDot).toBeTruthy(); // Orange for pending
-      expect(remotePendingDot).toBeTruthy(); // Cyan for remote-pending
     });
 
-    it('should render correct status text', () => {
+    it('should render correct status text for filter rules', () => {
+      const rule1: FilterRule = {
+        id: 'rule-1',
+        filter: '#test1',
+        fileName: 'test1',
+        isRemainder: false,
+      };
+
+      const rule2: FilterRule = {
+        id: 'rule-2',
+        filter: '#test2',
+        fileName: 'test2',
+        isRemainder: false,
+      };
+
       render(
         <SettingsView
             {...defaultProps}
+            filterRules={[rule1, rule2]}
+            filterSyncState={{
+              'rule-1': { status: 'pending' },
+              'rule-2': { status: 'synced', lastSynced: new Date('2026-07-28T15:45:30').getTime() },
+            }}
+            filterMatchCounts={{ 'rule-1': 5, 'rule-2': 3 }}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -257,19 +259,16 @@ describe('SettingsView', () => {
         />
       );
 
-      expect(screen.getByText(/Synced/)).toBeInTheDocument();
       expect(screen.getByText('Not yet synced')).toBeInTheDocument();
-      expect(screen.getByText('Backed up in Drive, not yet downloaded')).toBeInTheDocument();
+      expect(screen.getByText(/Synced Jul/)).toBeInTheDocument();
     });
 
-    it('should render Sync all now button', () => {
+    it('should render sync button when connected', () => {
       render(
         <SettingsView
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -277,10 +276,10 @@ describe('SettingsView', () => {
         />
       );
 
-      expect(screen.getByText('Sync all now')).toBeInTheDocument();
+      expect(screen.getByText('Sync filters now')).toBeInTheDocument();
     });
 
-    it('should call onSyncAllNow when Sync all now button is clicked', async () => {
+    it('should call onSyncAllNow when sync button is clicked', async () => {
       mockOnSyncAllNow.mockResolvedValueOnce(undefined);
 
       render(
@@ -288,8 +287,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -297,7 +294,7 @@ describe('SettingsView', () => {
         />
       );
 
-      const syncButton = screen.getByText('Sync all now');
+      const syncButton = screen.getByText('Sync filters now');
       fireEvent.click(syncButton);
 
       await waitFor(() => {
@@ -323,8 +320,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -346,8 +341,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -376,8 +369,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -404,8 +395,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -431,8 +420,6 @@ describe('SettingsView', () => {
             {...defaultProps}
           driveConnected={true}
           driveAccount="test@example.com"
-          fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -460,7 +447,6 @@ describe('SettingsView', () => {
         <SettingsView
             {...defaultProps}
           driveConnected={false}
-          fileSyncState={{}}
           onConnectDrive={mockOnConnectDrive}
           onDisconnectDrive={mockOnDisconnectDrive}
           onSyncAllNow={mockOnSyncAllNow}
@@ -488,219 +474,6 @@ describe('SettingsView', () => {
       '2026-07': 5,
     };
 
-    describe('Rendering tests', () => {
-      it('1. With syncMode="all", "Sync all" toggle button is visually active AND month-keyed backup list renders', () => {
-        const { container } = render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="all"
-            filterRules={[]}
-            filterSyncState={{}}
-            filterMatchCounts={{}}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const syncAllButton = screen.getByText('Sync all');
-        expect(syncAllButton).toHaveClass('sync-mode-button-active');
-
-        const backupFileRows = container.querySelectorAll('.backup-file-row');
-        expect(backupFileRows.length).toBe(1);
-      });
-
-      it('2. With syncMode="all", filter-rule editor does NOT render', () => {
-        render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="all"
-            filterRules={[]}
-            filterSyncState={{}}
-            filterMatchCounts={{}}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const filterRuleEditor = screen.queryByText('Filter, e.g. #project-atlas');
-        expect(filterRuleEditor).not.toBeInTheDocument();
-      });
-
-      it('3. With syncMode="filters" and one blank rule, filter-rule editor renders with empty inputs', async () => {
-        const user = userEvent.setup();
-        const blankRule: FilterRule = {
-          id: 'rule-1',
-          filter: '',
-          fileName: '',
-          isRemainder: false,
-        };
-
-        const { container } = render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="filters"
-            filterRules={[blankRule]}
-            filterSyncState={{
-              'rule-1': { status: 'pending' },
-            }}
-            filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const filterInputs = container.querySelectorAll('.filter-rule-input');
-        expect(filterInputs.length).toBeGreaterThan(0);
-
-        const filterInput = filterInputs[0] as HTMLInputElement;
-        expect(filterInput.value).toBe('');
-      });
-
-      it('4. With syncMode="filters", month-keyed "Backup files" list does NOT render', () => {
-        const rule: FilterRule = {
-          id: 'rule-1',
-          filter: '#test',
-          fileName: 'test',
-          isRemainder: false,
-        };
-
-        const { container } = render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="filters"
-            filterRules={[rule]}
-            filterSyncState={{
-              'rule-1': { status: 'pending' },
-            }}
-            filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const monthBackupRows = Array.from(container.querySelectorAll('.backup-file-row')).filter(
-          row => row.textContent?.includes('2026')
-        );
-        expect(monthBackupRows.length).toBe(0);
-      });
-
-      it('5. Both lists are never shown simultaneously', () => {
-        const rule: FilterRule = {
-          id: 'rule-1',
-          filter: '#test',
-          fileName: 'test',
-          isRemainder: false,
-        };
-
-        const { container } = render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="filters"
-            filterRules={[rule]}
-            filterSyncState={{
-              'rule-1': { status: 'pending' },
-            }}
-            filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const backupFileSections = container.querySelectorAll('.backup-files-section');
-        expect(backupFileSections.length).toBe(1);
-
-        const section = backupFileSections[0];
-        const rows = section.querySelectorAll('.backup-file-row');
-        const isFilterMode = rows.length === 1 && rows[0].textContent?.includes('entry');
-        expect(isFilterMode).toBe(true);
-      });
-    });
-
-    describe('Mode switching tests', () => {
-      it('6. Clicking "Sync with filters" calls onSetSyncModeFilters', async () => {
-        const user = userEvent.setup();
-
-        render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="all"
-            filterRules={[]}
-            filterSyncState={{}}
-            filterMatchCounts={{}}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const filterButton = screen.getByText('Sync with filters');
-        await user.click(filterButton);
-
-        expect(mockOnSetSyncModeFilters).toHaveBeenCalled();
-      });
-
-      it('7. Clicking "Sync all" (from filters mode) calls onSetSyncModeAll', async () => {
-        const user = userEvent.setup();
-
-        render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="filters"
-            filterRules={[]}
-            filterSyncState={{}}
-            filterMatchCounts={{}}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        const allButton = screen.getByText('Sync all');
-        await user.click(allButton);
-
-        expect(mockOnSetSyncModeAll).toHaveBeenCalled();
-      });
-    });
-
     describe('Add filter tests', () => {
       it('8. Clicking "+ Add filter" calls onAddFilterRule', async () => {
         const user = userEvent.setup();
@@ -710,11 +483,9 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[]}
             filterSyncState={{}}
             filterMatchCounts={{}}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -728,17 +499,15 @@ describe('SettingsView', () => {
         expect(mockOnAddFilterRule).toHaveBeenCalled();
       });
 
-      it('9. "+ Add "everything else" filter" is hidden when filterRules is empty', () => {
+      it('9. "+ Add "everything else" filter" is visible when filterRules is empty', () => {
         render(
           <SettingsView
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[]}
             filterSyncState={{}}
             filterMatchCounts={{}}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -746,8 +515,8 @@ describe('SettingsView', () => {
           />
         );
 
-        const remainderButton = screen.queryByText('+ Add "everything else" filter');
-        expect(remainderButton).not.toBeInTheDocument();
+        const remainderButton = screen.getByText('+ Add "everything else" filter');
+        expect(remainderButton).toBeInTheDocument();
       });
 
       it('10. "+ Add "everything else" filter" is hidden when a remainder rule already exists', () => {
@@ -763,13 +532,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -794,13 +561,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -827,13 +592,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -864,13 +627,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -905,13 +666,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -943,13 +702,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -980,13 +737,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1025,13 +780,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1063,13 +816,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1107,13 +858,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1149,13 +898,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1197,14 +944,12 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule1, rule2]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
               'rule-2': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5, 'rule-2': 3 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1239,14 +984,12 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule1, rule2]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
               'rule-2': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5, 'rule-2': 3 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1281,14 +1024,12 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule1, rule2]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
               'rule-2': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5, 'rule-2': 3 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1320,14 +1061,12 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule1, rule2]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
               'rule-2': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5, 'rule-2': 3 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1357,13 +1096,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1388,13 +1125,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1419,13 +1154,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1454,13 +1187,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1482,11 +1213,9 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[]}
             filterSyncState={{}}
             filterMatchCounts={{}}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1497,29 +1226,7 @@ describe('SettingsView', () => {
         expect(screen.getByText('Sync filters now')).toBeInTheDocument();
       });
 
-      it('30. Footer button reads "Sync all now" in all mode', () => {
-        render(
-          <SettingsView
-            {...defaultProps}
-            driveConnected={true}
-            driveAccount="test@example.com"
-            syncMode="all"
-            filterRules={[]}
-            filterSyncState={{}}
-            filterMatchCounts={{}}
-            fileSyncState={mockFileSyncState}
-          monthMatchCounts={mockMonthMatchCounts}
-            onConnectDrive={mockOnConnectDrive}
-            onDisconnectDrive={mockOnDisconnectDrive}
-            onSyncAllNow={mockOnSyncAllNow}
-            onBack={mockOnBack}
-          />
-        );
-
-        expect(screen.getByText('Sync all now')).toBeInTheDocument();
-      });
-
-      it('31. Footer button always calls onSyncAllNow either way', async () => {
+      it('30. Footer button always calls onSyncAllNow', async () => {
         const user = userEvent.setup();
 
         mockOnSyncAllNow.mockResolvedValueOnce(undefined);
@@ -1529,11 +1236,9 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[]}
             filterSyncState={{}}
             filterMatchCounts={{}}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1549,7 +1254,7 @@ describe('SettingsView', () => {
     });
 
     describe('Status display tests', () => {
-      it('32. Rule\'s status dot is orange and shows "Not yet synced" when status is pending', () => {
+      it('31. Rule\'s status dot is orange and shows "Not yet synced" when status is pending', () => {
         const rule: FilterRule = {
           id: 'rule-1',
           filter: '#test',
@@ -1562,13 +1267,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'pending' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1585,7 +1288,7 @@ describe('SettingsView', () => {
         expect(orangeDot).toBeTruthy();
       });
 
-      it('33. Rule\'s status dot is cyan and shows "Syncing…" when status is syncing (button also disabled)', () => {
+      it('32. Rule\'s status dot is cyan and shows "Syncing…" when status is syncing (button also disabled)', () => {
         const rule: FilterRule = {
           id: 'rule-1',
           filter: '#test',
@@ -1598,13 +1301,11 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': { status: 'syncing' },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1627,7 +1328,7 @@ describe('SettingsView', () => {
         expect(statusText).toBeInTheDocument();
       });
 
-      it('34. Rule\'s status dot is cyan and shows "Synced <formatted date>" when synced with lastSynced timestamp', () => {
+      it('33. Rule\'s status dot is cyan and shows "Synced <formatted date>" when synced with lastSynced timestamp', () => {
         const rule: FilterRule = {
           id: 'rule-1',
           filter: '#test',
@@ -1640,7 +1341,6 @@ describe('SettingsView', () => {
             {...defaultProps}
             driveConnected={true}
             driveAccount="test@example.com"
-            syncMode="filters"
             filterRules={[rule]}
             filterSyncState={{
               'rule-1': {
@@ -1649,7 +1349,6 @@ describe('SettingsView', () => {
               },
             }}
             filterMatchCounts={{ 'rule-1': 5 }}
-            fileSyncState={{}}
             onConnectDrive={mockOnConnectDrive}
             onDisconnectDrive={mockOnDisconnectDrive}
             onSyncAllNow={mockOnSyncAllNow}
@@ -1663,30 +1362,6 @@ describe('SettingsView', () => {
           d => (d as HTMLElement).style.backgroundColor === 'rgb(0, 169, 206)'
         );
         expect(cyanDot).toBeTruthy();
-      });
-    });
-
-    describe('Edge case: undefined fileSyncState entry', () => {
-      it('should not crash when fileSyncState contains undefined entry', () => {
-        const fileSyncStateWithUndefined = {
-          '2026-06': { status: 'synced' as const },
-          '2026-05': undefined as unknown as FileSyncState,
-        };
-
-        expect(() => {
-          render(
-            <SettingsView
-              {...defaultProps}
-              driveConnected={true}
-              driveAccount="test@example.com"
-              fileSyncState={fileSyncStateWithUndefined}
-              onConnectDrive={mockOnConnectDrive}
-              onDisconnectDrive={mockOnDisconnectDrive}
-              onSyncAllNow={mockOnSyncAllNow}
-              onBack={mockOnBack}
-            />
-          );
-        }).not.toThrow();
       });
     });
   });

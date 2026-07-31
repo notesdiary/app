@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { initDB, getDB } from '../lib/db';
 import {
-  getSyncMode,
-  setSyncMode,
   getFilterRules,
   setFilterRules,
   getFilterSyncState,
@@ -23,19 +21,6 @@ describe('metaRepo', () => {
       await tx.store.delete(key);
     }
     await tx.done;
-  });
-
-  describe('getSyncMode / setSyncMode', () => {
-    it('getSyncMode() with nothing stored returns "all"', async () => {
-      const mode = await getSyncMode();
-      expect(mode).toBe('all');
-    });
-
-    it('setSyncMode("filters") then getSyncMode() returns "filters"', async () => {
-      await setSyncMode('filters');
-      const mode = await getSyncMode();
-      expect(mode).toBe('filters');
-    });
   });
 
   describe('getFilterRules / setFilterRules', () => {
