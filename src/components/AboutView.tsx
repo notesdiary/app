@@ -67,9 +67,8 @@ export function AboutView(props: AboutViewProps) {
             </p>
             <ol className="about-ordered-list">
               <li>Go to Settings and connect Google Drive</li>
-              <li>Switch from "Sync all" to "Sync with filters"</li>
               <li>Create a filter for each audience (e.g., #team, #personal, #project-x)</li>
-              <li>Only entries matching those filters are backed up to Google Drive</li>
+              <li>Entries matching those filters are automatically backed up to Google Drive</li>
               <li>Share the specific Drive file with others using Google Drive's sharing features</li>
             </ol>
             <p className="about-text">
