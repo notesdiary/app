@@ -1,25 +1,9 @@
 import { DriveMeta, FileSyncState, FilterRule } from '../types';
 import { getDB } from './db';
 
-const EXTRA_DATES_KEY = 'extra-dates';
 const DRIVE_META_KEY = 'drive-meta';
 const FILTER_RULES_KEY = 'filter-rules';
 const FILTER_SYNC_STATE_KEY = 'filter-sync-state';
-
-export async function getExtraDates(): Promise<string[]> {
-  const db = await getDB();
-  const dates = await db.get('meta', EXTRA_DATES_KEY);
-  return (dates as string[]) || [];
-}
-
-export async function addExtraDate(date: string): Promise<void> {
-  const db = await getDB();
-  const dates = await getExtraDates();
-  if (!dates.includes(date)) {
-    dates.push(date);
-    await db.put('meta', dates, EXTRA_DATES_KEY);
-  }
-}
 
 export async function getDriveMeta(): Promise<DriveMeta> {
   const db = await getDB();

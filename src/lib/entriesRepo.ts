@@ -85,3 +85,14 @@ export async function listAllArchivedEntries(): Promise<Entry[]> {
   const allEntries = await db.getAll('entries');
   return allEntries.filter(entry => entry.archived);
 }
+
+export async function countArchivedEntries(): Promise<number> {
+  const db = await getDB();
+  let count = 0;
+  let cursor = await db.transaction('entries').store.openCursor();
+  while (cursor) {
+    if (cursor.value.archived) count++;
+    cursor = await cursor.continue();
+  }
+  return count;
+}

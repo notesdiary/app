@@ -46,7 +46,7 @@ describe('ArchiveView', () => {
     render(<ArchiveView onBackClick={mockBackClick} />);
 
     await waitFor(() => {
-      expect(screen.getByText('Archive')).toBeInTheDocument();
+      expect(screen.getByText('Archived')).toBeInTheDocument();
     });
     expect(
       screen.getByText(

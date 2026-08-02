@@ -23,7 +23,6 @@ describe('App', () => {
       vi.mocked(metaRepo.getFilterRules).mockResolvedValueOnce([]);
       vi.mocked(metaRepo.setFilterRules).mockResolvedValueOnce(undefined);
       vi.mocked(metaRepo.getFilterSyncState).mockResolvedValueOnce({});
-      vi.mocked(metaRepo.getExtraDates).mockResolvedValueOnce([]);
       vi.mocked(metaRepo.getDriveMeta).mockResolvedValueOnce({
         driveConnected: false,
       });

@@ -16,27 +16,25 @@ describe('App view switching', () => {
     await tx.done;
   });
 
-  it('returns to diary view when a date is clicked while on Archive view', async () => {
+  it('returns to diary view when back is clicked from Archive view', async () => {
     render(<App />);
 
-    const archiveButton = await screen.findByRole('button', { name: 'Archive' });
+    const archiveButton = await screen.findByRole('button', { name: 'Archived' });
     await userEvent.click(archiveButton);
 
     await waitFor(() => {
       expect(screen.getByText('Nothing archived.')).toBeInTheDocument();
     });
 
-    const dateButtons = document.querySelectorAll('.date-item');
-    expect(dateButtons.length).toBeGreaterThan(0);
-    await userEvent.click(dateButtons[0] as HTMLElement);
+    const backButton = screen.getByRole('button', { name: /Back/ });
+    await userEvent.click(backButton);
 
     await waitFor(() => {
       expect(screen.queryByText('Nothing archived.')).not.toBeInTheDocument();
-      expect(document.querySelector('.date-item')).toBeInTheDocument();
     });
   });
 
-  it('returns to diary view when a date is clicked while on Settings view', async () => {
+  it('returns to diary view when back is clicked from Settings view', async () => {
     render(<App />);
 
     const settingsButton = await screen.findByRole('button', { name: 'Settings' });
@@ -46,12 +44,11 @@ describe('App view switching', () => {
       expect(document.querySelector('.settings-view, [class*="settings"]')).toBeTruthy();
     });
 
-    const dateButtons = document.querySelectorAll('.date-item');
-    expect(dateButtons.length).toBeGreaterThan(0);
-    await userEvent.click(dateButtons[0] as HTMLElement);
+    const backButton = screen.getByRole('button', { name: /Back/ });
+    await userEvent.click(backButton);
 
     await waitFor(() => {
-      expect(document.querySelector('.date-item')).toBeInTheDocument();
+      expect(screen.queryByText('Browse by tag')).toBeInTheDocument();
     });
   });
 });

@@ -118,7 +118,7 @@ export function ArchiveView(props: ArchiveViewProps) {
 
       <div className="archive-content">
         <div className="archive-title-section">
-          <h1 className="archive-title">Archive</h1>
+          <h1 className="archive-title">Archived</h1>
           <p className="archive-subtitle">
             Removed entries land here instead of being deleted, grouped one document per month to match your Drive backups. Restore them or delete them for good.
           </p>

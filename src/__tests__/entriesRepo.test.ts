@@ -9,6 +9,7 @@ import {
   deleteEntryForever,
   listAllEntries,
   listAllArchivedEntries,
+  countArchivedEntries,
 } from '../lib/entriesRepo';
 
 describe('entriesRepo', () => {
@@ -161,5 +162,40 @@ describe('entriesRepo', () => {
     await expect(restoreEntry('non-existent-id')).rejects.toThrow(
       'Entry with id non-existent-id not found'
     );
+  });
+
+  it('counts archived entries: 5 entries with 2 archived returns 2', async () => {
+    const entry1 = await createEntry('2024-01-15', '10:30', 'Note 1');
+    const entry2 = await createEntry('2024-01-15', '11:30', 'Note 2');
+    const entry3 = await createEntry('2024-01-15', '12:30', 'Note 3');
+    const entry4 = await createEntry('2024-01-15', '13:30', 'Note 4');
+    const entry5 = await createEntry('2024-01-15', '14:30', 'Note 5');
+
+    await archiveEntry(entry1.id);
+    await archiveEntry(entry2.id);
+
+    const count = await countArchivedEntries();
+    expect(count).toBe(2);
+  });
+
+  it('counts archived entries: with zero entries returns 0', async () => {
+    const count = await countArchivedEntries();
+    expect(count).toBe(0);
+  });
+
+  it('counts archived entries: after restoring one of 2 archived returns 1', async () => {
+    const entry1 = await createEntry('2024-01-15', '10:30', 'Note 1');
+    const entry2 = await createEntry('2024-01-15', '11:30', 'Note 2');
+
+    await archiveEntry(entry1.id);
+    await archiveEntry(entry2.id);
+
+    let count = await countArchivedEntries();
+    expect(count).toBe(2);
+
+    await restoreEntry(entry1.id);
+
+    count = await countArchivedEntries();
+    expect(count).toBe(1);
   });
 });

@@ -9,14 +9,13 @@ import { splitParts, splitSections } from './tags';
 export function filterEntries(
   entries: Entry[],
   mode: ViewMode,
-  selectedDate: string,
   selectedTags: string[],
   searchQuery: string
 ): Entry[] {
   let filtered = entries;
 
-  if (mode === 'day') {
-    filtered = entries.filter(e => e.date === selectedDate);
+  if (mode === 'all') {
+    filtered = entries;
   } else if (mode === 'tag') {
     filtered = entries.filter(e => {
       const sections = splitSections(e.text);
@@ -58,7 +57,7 @@ export function filterParagraphsInEntry(
 ): string[] {
   const sections = splitSections(entry.text);
 
-  if (mode === 'day') {
+  if (mode === 'all') {
     return sections;
   }
 

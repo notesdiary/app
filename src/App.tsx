@@ -3,13 +3,12 @@ import { Entry, FileSyncState, FilterRule } from './types';
 import { getTodayISO } from './lib/dateUtils';
 import { deriveMode } from './lib/mode';
 import { filterEntries, filterParagraphsInEntry } from './lib/entryFiltering';
-import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries } from './lib/entriesRepo';
-import { getExtraDates, addExtraDate, getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
+import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries, countArchivedEntries } from './lib/entriesRepo';
+import { getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
 import { getAccessToken, requestAccessToken, revokeToken, getAuthStatus } from './lib/googleAuth';
 import { findOrCreateAppFolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent, DrivePermission, listPermissions, createPermission, createAnyonePermission, updatePermission, deletePermission } from './lib/driveApi';
 import { useWindowWidth } from './hooks/useWindowWidth';
 import { LeftRail } from './components/LeftRail';
-import { RightRail } from './components/RightRail';
 import { DiaryView } from './components/DiaryView';
 import { ArchiveView } from './components/ArchiveView';
 import { SettingsView } from './components/SettingsView';
@@ -22,7 +21,7 @@ type ViewType = 'diary' | 'settings' | 'archive' | 'about';
 function App() {
   // State: entries and metadata
   const [entries, setEntries] = useState<Entry[]>([]);
-  const [extraDates, setExtraDates] = useState<string[]>([]);
+  const [archivedCount, setArchivedCount] = useState(0);
 
   // State: Google Drive
   const [driveConnected, setDriveConnected] = useState(false);
@@ -35,7 +34,6 @@ function App() {
   const [filterSyncState, setFilterSyncStateLocal] = useState<Record<string, FileSyncState>>({});
 
   // State: UI filters and mode
-  const [selectedDate, setSelectedDate] = useState(getTodayISO());
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -48,22 +46,18 @@ function App() {
 
   // State: navigation
   const [view, setView] = useState<ViewType>('diary');
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // State: responsive UI
   const width = useWindowWidth();
   const isMobile = width < 960;
-  const [leftOpen, setLeftOpen] = useState(!isMobile);
-  const [rightOpen, setRightOpen] = useState(!isMobile);
+  const [leftOpen, setLeftOpen] = useState(true);
 
   // Load entries from IndexedDB on mount
   useEffect(() => {
     (async () => {
       const allEntries = await listAllEntries();
       setEntries(allEntries);
-
-      const dates = await getExtraDates();
-      setExtraDates(dates);
+      setArchivedCount(await countArchivedEntries());
 
       // Load Drive metadata
       const driveMeta = await getDriveMeta();
@@ -87,13 +81,6 @@ function App() {
     })();
   }, []);
 
-  // Update window state on mobile/desktop transition
-  useEffect(() => {
-    if (!isMobile) {
-      setLeftOpen(true);
-      setRightOpen(true);
-    }
-  }, [isMobile]);
 
   // Auto-sync to Drive every 5 minutes when connected
   useEffect(() => {
@@ -135,7 +122,7 @@ function App() {
   const mode = deriveMode(searchQuery, selectedTags);
 
   // Filter entries based on current mode and filters
-  const filteredEntries = filterEntries(entries, mode, selectedDate, selectedTags, searchQuery);
+  const filteredEntries = filterEntries(entries, mode, selectedTags, searchQuery);
 
   // Rule CRUD (local + persisted, no Drive calls)
   const addFilterRule = async () => {
@@ -219,7 +206,7 @@ function App() {
     const timeStr = `${hours}:${minutes}`;
 
     try {
-      const newEntry = await createEntry(selectedDate, timeStr, trimmed);
+      const newEntry = await createEntry(getTodayISO(), timeStr, trimmed);
       setEntries([newEntry, ...entries]);
       setComposerText('');
     } catch (error) {
@@ -278,59 +265,28 @@ function App() {
     try {
       await archiveEntry(id);
       setEntries(entries.filter(e => e.id !== id));
+      setArchivedCount(c => c + 1);
     } catch (error) {
       console.error('Failed to archive entry:', error);
     }
   };
 
-  // Handle selecting a date
-  const handleSelectDate = (date: string) => {
-    setSelectedDate(date);
-    setSelectedTags([]);
-    setSearchQuery('');
-    setEditingId(null);
-    setView('diary');
-    closeDrawersOnMobile();
-  };
-
-  // Handle adding an extra date
-  const handleAddExtraDate = async (date: string) => {
-    try {
-      await addExtraDate(date);
-      setExtraDates(prev => [...new Set([...prev, date])]);
-    } catch (error) {
-      console.error('Failed to add extra date:', error);
-    }
-  };
 
   // Close drawers on mobile when navigating
   const closeDrawersOnMobile = () => {
     if (isMobile) {
       setLeftOpen(false);
-      setRightOpen(false);
     }
   };
 
-  // Close both drawers
+  // Close all drawers
   const closeAllDrawers = () => {
     setLeftOpen(false);
-    setRightOpen(false);
   };
 
   // Handle hamburger button
   const handleHamburgerClick = () => {
     setLeftOpen(!leftOpen);
-    if (rightOpen) {
-      setRightOpen(false);
-    }
-  };
-
-  // Handle tag button
-  const handleTagButtonClick = () => {
-    setRightOpen(!rightOpen);
-    if (leftOpen) {
-      setLeftOpen(false);
-    }
   };
 
   // Handle settings click
@@ -648,16 +604,15 @@ function App() {
     }
   };
 
-  const showBackdrop = isMobile && (leftOpen || rightOpen);
+  const showBackdrop = isMobile && leftOpen;
 
   return (
     <div className="app-layout">
       <LeftRail
-        selectedDate={selectedDate}
-        onSelectDate={handleSelectDate}
-        onAddExtraDate={handleAddExtraDate}
         entries={entries}
-        extraDates={extraDates}
+        selectedTags={selectedTags}
+        onTagClick={handleTagClick}
+        archivedCount={archivedCount}
         onSettingsClick={handleSettingsClick}
         onArchiveClick={handleArchiveClick}
         onAboutClick={handleAboutClick}
@@ -669,7 +624,6 @@ function App() {
         {view === 'diary' && (
           <DiaryView
             entries={filteredEntries}
-            selectedDate={selectedDate}
             searchQuery={searchQuery}
             selectedTags={selectedTags}
             composerText={composerText}
@@ -688,8 +642,6 @@ function App() {
             onEntryRemove={handleEntryRemove}
             onEntryClickToEdit={handleEntryClickToEdit}
             onHamburgerClick={handleHamburgerClick}
-            onTagButtonClick={handleTagButtonClick}
-            isMobile={isMobile}
           />
         )}
         {view === 'settings' && (
@@ -716,29 +668,16 @@ function App() {
             onBack={() => setView('diary')}
           />
         )}
-        {view === 'archive' && <ArchiveView onBackClick={() => setView('diary')} />}
+        {view === 'archive' && (
+          <ArchiveView
+            onBackClick={async () => {
+              setView('diary');
+              setArchivedCount(await countArchivedEntries());
+            }}
+          />
+        )}
         {view === 'about' && <AboutView onBack={() => setView('diary')} />}
       </main>
-
-      {!isMobile && (
-        <RightRail
-          entries={entries}
-          selectedTags={selectedTags}
-          onTagClick={handleTagClick}
-          isMobile={false}
-          isOpen={true}
-        />
-      )}
-
-      {isMobile && (
-        <RightRail
-          entries={entries}
-          selectedTags={selectedTags}
-          onTagClick={handleTagClick}
-          isMobile={true}
-          isOpen={rightOpen}
-        />
-      )}
 
       {showBackdrop && <Backdrop onClose={closeAllDrawers} />}
     </div>

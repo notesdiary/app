@@ -7,7 +7,6 @@ import './DiaryView.css';
 
 interface DiaryViewProps {
   entries: Entry[];
-  selectedDate: string;
   searchQuery: string;
   selectedTags: string[];
   composerText: string;
@@ -23,8 +22,6 @@ interface DiaryViewProps {
   onEntryRemove: (id: string) => void;
   onEntryClickToEdit: (id: string) => void;
   onHamburgerClick: () => void;
-  onTagButtonClick: () => void;
-  isMobile: boolean;
 }
 
 export function DiaryView(props: DiaryViewProps) {
@@ -34,12 +31,10 @@ export function DiaryView(props: DiaryViewProps) {
         searchQuery={props.searchQuery}
         onSearchChange={props.onSearchChange}
         onHamburgerClick={props.onHamburgerClick}
-        onTagButtonClick={props.onTagButtonClick}
-        isMobile={props.isMobile}
       />
 
       <div className="diary-content">
-        {props.mode === 'day' && (
+        {props.mode === 'all' && (
           <Composer
             text={props.composerText}
             onTextChange={props.onComposerTextChange}

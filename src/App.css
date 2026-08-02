@@ -35,8 +35,7 @@
     position: relative;
   }
 
-  .left-rail,
-  .right-rail {
+  .left-rail {
     position: fixed;
   }
 }

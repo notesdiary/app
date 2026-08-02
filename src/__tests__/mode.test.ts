@@ -3,9 +3,9 @@ import { deriveMode } from '../lib/mode';
 
 describe('mode', () => {
   describe('deriveMode', () => {
-    it('returns day mode when no filters are active', () => {
+    it('returns all mode when no filters are active', () => {
       const result = deriveMode('', []);
-      expect(result).toBe('day');
+      expect(result).toBe('all');
     });
 
     it('returns tag mode when tags are selected but no search', () => {
@@ -33,9 +33,9 @@ describe('mode', () => {
       expect(result).toBe('tag');
     });
 
-    it('ignores whitespace-only search query for day mode', () => {
+    it('ignores whitespace-only search query for all mode', () => {
       const result = deriveMode('   ', []);
-      expect(result).toBe('day');
+      expect(result).toBe('all');
     });
   });
 });

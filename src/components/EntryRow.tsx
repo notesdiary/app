@@ -52,7 +52,7 @@ export const EntryRow: React.FC<EntryRowProps> = (props) => {
     >
       <div className="entry-header">
         <div className="entry-time">{timeFormatted}</div>
-        {props.mode !== 'day' && <div className="entry-date">{md}</div>}
+        <div className="entry-date">{md}</div>
         <button
           className={`entry-remove-button ${hovering ? 'visible' : ''}`}
           onClick={props.onRemove}
