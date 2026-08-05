@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Entry, FileSyncState, FilterRule } from './types';
+import { Entry, FileSyncState, FilterRule, Project } from './types';
 import { getTodayISO } from './lib/dateUtils';
 import { deriveMode } from './lib/mode';
 import { filterEntries, filterParagraphsInEntry } from './lib/entryFiltering';
 import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries, countArchivedEntries } from './lib/entriesRepo';
 import { getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
 import { getAccessToken, requestAccessToken, revokeToken, getAuthStatus } from './lib/googleAuth';
-import { findOrCreateAppFolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent, DrivePermission, listPermissions, createPermission, createAnyonePermission, updatePermission, deletePermission } from './lib/driveApi';
+import { findOrCreateAppFolder, findOrCreateSubfolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent, DrivePermission, listPermissions, createPermission, createAnyonePermission, updatePermission, deletePermission } from './lib/driveApi';
+import { setActiveProjectDb } from './lib/db';
+import { listProjects, createProject, deleteProject, getProject, migrateLegacyDbIfNeeded } from './lib/projectRegistry';
+import { useHashRoute } from './hooks/useHashRoute';
+import { navigateToProject, navigateToPicker } from './lib/router';
 import { useWindowWidth } from './hooks/useWindowWidth';
 import { LeftRail } from './components/LeftRail';
 import { DiaryView } from './components/DiaryView';
@@ -14,11 +18,16 @@ import { ArchiveView } from './components/ArchiveView';
 import { SettingsView } from './components/SettingsView';
 import { AboutView } from './components/AboutView';
 import { Backdrop } from './components/Backdrop';
+import { ProjectPicker } from './components/ProjectPicker';
 import './App.css';
 
 type ViewType = 'diary' | 'settings' | 'archive' | 'about';
 
 function App() {
+  // State: projects and active project
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProject, setActiveProject] = useState<Project | null>(null);
+
   // State: entries and metadata
   const [entries, setEntries] = useState<Entry[]>([]);
   const [archivedCount, setArchivedCount] = useState(0);
@@ -52,8 +61,23 @@ function App() {
   const isMobile = width < 960;
   const [leftOpen, setLeftOpen] = useState(true);
 
-  // Load entries from IndexedDB on mount
+  // Load projects from registry on mount
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   useEffect(() => {
+    (async () => {
+      await migrateLegacyDbIfNeeded();
+      setProjects(await listProjects());
+      setProjectsLoaded(true);
+    })();
+  }, []);
+
+  // Get the current route
+  const route = useHashRoute();
+
+  // Load entries from IndexedDB on mount (guarded by activeProject)
+  useEffect(() => {
+    if (!activeProject) return;
+
     (async () => {
       const allEntries = await listAllEntries();
       setEntries(allEntries);
@@ -79,7 +103,7 @@ function App() {
         setFilterRulesLocal(rules);
       }
     })();
-  }, []);
+  }, [activeProject?.id]);
 
 
   // Auto-sync to Drive every 5 minutes when connected
@@ -307,6 +331,9 @@ function App() {
     closeDrawersOnMobile();
   };
 
+  // Handle switch project click
+  const handleSwitchProject = () => navigateToPicker();
+
   // Helper functions for filter sync
   const isRuleSkippable = (rule: FilterRule): boolean => {
     const filterEmpty = !rule.filter.trim();
@@ -476,13 +503,39 @@ function App() {
     return updatePermission(token, fileId, permissionId, role);
   };
 
+  // Project handlers
+  const handleCreateProject = async (name: string) => {
+    await createProject(name);
+    setProjects(await listProjects());
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    await deleteProject(id);
+    setProjects(await listProjects());
+  };
+
   const handleDiscoverDriveFolder = async (token: string) => {
     try {
-      const folderId = await findOrCreateAppFolder(token);
-      setDriveFolderId(folderId);
-      await setDriveMeta({ driveFolderId: folderId });
+      const topLevelFolderId = await findOrCreateAppFolder(token);
 
-      const files = await listBackupFiles(token, folderId);
+      // Branch behavior based on whether project is migrated or new
+      let driveFolderId: string;
+      if (activeProject?.dbName === 'notes-diary') {
+        // Migrated project: use top-level folder directly
+        driveFolderId = topLevelFolderId;
+      } else {
+        // New project: create a subfolder with the project name
+        if (!activeProject) {
+          throw new Error('activeProject is not set');
+        }
+        const subfolderFolderId = await findOrCreateSubfolder(token, topLevelFolderId, activeProject.name);
+        driveFolderId = subfolderFolderId;
+      }
+
+      setDriveFolderId(driveFolderId);
+      await setDriveMeta({ driveFolderId });
+
+      const files = await listBackupFiles(token, driveFolderId);
 
       // Build a map of fileName -> file for quick lookup
       const fileMap = new Map(files.map(f => [f.name, f]));
@@ -606,6 +659,35 @@ function App() {
 
   const showBackdrop = isMobile && leftOpen;
 
+  // Handle routing: if on project route, load the project; if on picker route, show picker
+  useEffect(() => {
+    if (!projectsLoaded) return;
+    if (route.name === 'project' && route.projectId) {
+      const project = projects.find(p => p.id === route.projectId);
+      if (project) {
+        setActiveProjectDb(project.dbName);
+        setActiveProject(project);
+      } else {
+        // Project not found, redirect to picker
+        navigateToPicker();
+      }
+    }
+  }, [route, projects, projectsLoaded]);
+
+  // If on picker route, show ProjectPicker instead of the shell
+  if (route.name === 'picker') {
+    return (
+      <div className="app-layout">
+        <ProjectPicker
+          projects={projects}
+          onCreate={handleCreateProject}
+          onDelete={handleDeleteProject}
+          onOpen={navigateToProject}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="app-layout">
       <LeftRail
@@ -616,6 +698,7 @@ function App() {
         onSettingsClick={handleSettingsClick}
         onArchiveClick={handleArchiveClick}
         onAboutClick={handleAboutClick}
+        onSwitchProjectClick={handleSwitchProject}
         isMobile={isMobile}
         isOpen={leftOpen}
       />

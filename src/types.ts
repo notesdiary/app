@@ -28,3 +28,5 @@ export type DriveMeta = {
   driveAccount?: string;
   driveFolderId?: string;
 };
+
+export type Project = { id: string; name: string; dbName: string; createdAt: number; };

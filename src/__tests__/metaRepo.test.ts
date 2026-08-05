@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { initDB, getDB } from '../lib/db';
+import { initDB, getDB, setActiveProjectDb } from '../lib/db';
 import {
   getFilterRules,
   setFilterRules,
@@ -12,6 +12,7 @@ import {
 
 describe('metaRepo', () => {
   beforeEach(async () => {
+    setActiveProjectDb('test-metaRepo-db');
     // Clear any previous DB state
     const db = await getDB();
     // Clear all meta entries before each test

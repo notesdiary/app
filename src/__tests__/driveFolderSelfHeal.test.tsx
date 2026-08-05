@@ -3,8 +3,18 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../App';
-import { getDB } from '../lib/db';
+import { getDB, setActiveProjectDb } from '../lib/db';
 import { setDriveMeta, setFilterRules } from '../lib/metaRepo';
+
+const TEST_PROJECT = vi.hoisted(() => ({ id: 'proj-test', name: 'Test Project', dbName: 'test-driveFolderSelfHeal-db', createdAt: 0 }));
+
+vi.mock('../lib/projectRegistry', () => ({
+  listProjects: vi.fn(async () => [TEST_PROJECT]),
+  migrateLegacyDbIfNeeded: vi.fn(async () => {}),
+  createProject: vi.fn(),
+  deleteProject: vi.fn(),
+  getProject: vi.fn(async () => TEST_PROJECT),
+}));
 
 vi.mock('../lib/googleAuth', () => ({
   getAccessToken: vi.fn(async () => 'fake-token'),
@@ -27,6 +37,8 @@ import { getDriveMeta } from '../lib/metaRepo';
 // persistence fix: driveConnected is true but driveFolderId was never saved.
 describe('Drive folder ID self-heal', () => {
   beforeEach(async () => {
+    window.location.hash = `#/project/${TEST_PROJECT.id}`;
+    setActiveProjectDb(TEST_PROJECT.dbName);
     const db = await getDB();
     for (const store of ['entries', 'meta'] as const) {
       const tx = db.transaction(store, 'readwrite');

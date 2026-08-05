@@ -4,14 +4,11 @@ import { Entry, DriveMeta } from '../types';
 // Using any for schema due to idb type definition strictness
 type NotesDiaryDB = any;
 
-let db: IDBPDatabase<NotesDiaryDB> | null = null;
+const dbHandles: Map<string, Promise<IDBPDatabase<NotesDiaryDB>>> = new Map();
+let activeProjectDbName: string | null = null;
 
-export async function initDB(): Promise<IDBPDatabase<NotesDiaryDB>> {
-  if (db) {
-    return db;
-  }
-
-  db = await openDB<NotesDiaryDB>('notes-diary', 2, {
+export async function initDB(dbName: string): Promise<IDBPDatabase<NotesDiaryDB>> {
+  const openPromise = openDB<NotesDiaryDB>(dbName, 2, {
     upgrade(db, oldVersion, newVersion, transaction) {
       // Create entries object store
       if (!db.objectStoreNames.contains('entries')) {
@@ -34,12 +31,28 @@ export async function initDB(): Promise<IDBPDatabase<NotesDiaryDB>> {
     },
   });
 
-  return db;
+  dbHandles.set(dbName, openPromise);
+  return openPromise;
 }
 
-export async function getDB(): Promise<IDBPDatabase<NotesDiaryDB>> {
-  if (!db) {
-    return initDB();
+export async function getDB(dbName?: string): Promise<IDBPDatabase<NotesDiaryDB>> {
+  const name = dbName ?? activeProjectDbName;
+  if (!name) {
+    throw new Error('getDB called with no dbName and no active project set');
   }
-  return db;
+
+  if (!dbHandles.has(name)) {
+    dbHandles.set(name, initDB(name));
+  }
+
+  return dbHandles.get(name)!;
+}
+
+export function setActiveProjectDb(dbName: string | null): void {
+  activeProjectDbName = dbName;
+}
+
+export function _resetDbHandlesForTests(): void {
+  dbHandles.clear();
+  activeProjectDbName = null;
 }

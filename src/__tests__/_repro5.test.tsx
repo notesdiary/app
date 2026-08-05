@@ -1,12 +1,24 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import App from '../App';
-import { getDB } from '../lib/db';
+import { getDB, setActiveProjectDb } from '../lib/db';
+
+const TEST_PROJECT = vi.hoisted(() => ({ id: 'proj-test', name: 'Test Project', dbName: 'test-repro5-db', createdAt: 0 }));
+
+vi.mock('../lib/projectRegistry', () => ({
+  listProjects: vi.fn(async () => [TEST_PROJECT]),
+  migrateLegacyDbIfNeeded: vi.fn(async () => {}),
+  createProject: vi.fn(),
+  deleteProject: vi.fn(),
+  getProject: vi.fn(async () => TEST_PROJECT),
+}));
 
 describe('tag filter real flow repro with blank line', () => {
   beforeEach(async () => {
+    window.location.hash = `#/project/${TEST_PROJECT.id}`;
+    setActiveProjectDb(TEST_PROJECT.dbName);
     const db = await getDB();
     const tx = db.transaction('entries', 'readwrite');
     const allKeys = await tx.store.getAllKeys();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
-import { initDB, getDB } from '../lib/db';
+import { initDB, getDB, setActiveProjectDb } from '../lib/db';
 import {
   createEntry,
   updateEntryText,
@@ -14,6 +14,7 @@ import {
 
 describe('entriesRepo', () => {
   beforeEach(async () => {
+    setActiveProjectDb('test-entriesRepo-db');
     // Clear any previous DB state
     const db = await getDB();
     // Clear all entries before each test

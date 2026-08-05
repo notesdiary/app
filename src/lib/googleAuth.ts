@@ -1,3 +1,5 @@
+import { getOAuthToken, setOAuthToken, clearOAuthToken } from './metaRepo';
+
 declare global {
   interface Window {
     google: any;
@@ -14,7 +16,6 @@ let tokenClient: any;
 let tokenResolve: ((token: string) => void) | null = null;
 let tokenReject: ((error: Error) => void) | null = null;
 let inFlightTokenPromise: Promise<string> | null = null;
-const TOKEN_STORAGE_KEY = 'notes_diary_oauth_token';
 const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;  // Refresh 5 min before expiry
 
 const logger = {
@@ -24,21 +25,20 @@ const logger = {
 };
 
 /**
- * Load cached token from localStorage if valid.
+ * Load cached token from IndexedDB if valid.
  * Returns null if token is missing, expired, or invalid.
  */
-function getCachedToken(): TokenData | null {
+async function getCachedToken(): Promise<TokenData | null> {
   try {
-    const stored = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!stored) return null;
+    const data = await getOAuthToken();
+    if (!data) return null;
 
-    const data: TokenData = JSON.parse(stored);
     const now = Date.now();
 
     // Check expiry with buffer (refresh 5 min before actual expiry)
     if (data.expires_at && now >= data.expires_at - TOKEN_EXPIRY_BUFFER_MS) {
       logger.debug('Cached token expired (or expiring soon), will refresh');
-      clearToken();
+      await clearToken();
       return null;
     }
 
@@ -51,24 +51,24 @@ function getCachedToken(): TokenData | null {
 }
 
 /**
- * Save token to localStorage with expiry tracking.
+ * Save token to IndexedDB with expiry tracking.
  * GIS client doesn't provide explicit expiry, assume standard 1 hour.
  */
-function saveToken(accessToken: string): void {
+async function saveToken(accessToken: string): Promise<void> {
   const data: TokenData = {
     access_token: accessToken,
     expires_at: Date.now() + 3600 * 1000,  // 1 hour (standard Google access token TTL)
     requested_at: Date.now(),
   };
-  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(data));
+  await setOAuthToken(data);
   logger.info('Token saved to storage');
 }
 
 /**
  * Clear cached token (on logout/revocation).
  */
-function clearToken(): void {
-  localStorage.removeItem(TOKEN_STORAGE_KEY);
+async function clearToken(): Promise<void> {
+  await clearOAuthToken();
   logger.info('Token cleared from storage');
 }
 
@@ -78,7 +78,7 @@ function clearToken(): void {
  */
 export async function getAccessToken(): Promise<string> {
   // Try cached token first
-  const cached = getCachedToken();
+  const cached = await getCachedToken();
   if (cached) {
     return cached.access_token;
   }
@@ -115,13 +115,13 @@ export async function requestAccessToken(prompt: 'consent' | 'none' = 'none'): P
       tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: (response: any) => {
+        callback: async (response: any) => {
           if (response.error) {
             logger.error('Token request failed:', response.error);
             tokenReject?.(new Error(`OAuth error: ${response.error}`));
           } else {
             logger.info('Token obtained successfully');
-            saveToken(response.access_token);
+            await saveToken(response.access_token);
             tokenResolve?.(response.access_token);
           }
         },
@@ -156,12 +156,12 @@ export async function revokeToken(token: string): Promise<void> {
       logger.error('Token revocation returned status', response.status);
     }
 
-    clearToken();
+    await clearToken();
     logger.info('Token revoked successfully');
   } catch (error) {
     logger.error('Failed to revoke token:', error);
     // Still clear cached token even if revocation failed (best-effort)
-    clearToken();
+    await clearToken();
     throw error;
   }
 }
@@ -169,8 +169,8 @@ export async function revokeToken(token: string): Promise<void> {
 /**
  * Get authentication status: whether a valid token exists.
  */
-export function getAuthStatus(): { authenticated: boolean; cachedToken: boolean } {
-  const cached = getCachedToken();
+export async function getAuthStatus(): Promise<{ authenticated: boolean; cachedToken: boolean }> {
+  const cached = await getCachedToken();
   return {
     authenticated: cached !== null,
     cachedToken: cached !== null,

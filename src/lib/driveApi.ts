@@ -25,6 +25,31 @@ export async function findOrCreateAppFolder(token: string): Promise<string> {
   return createData.id;
 }
 
+export async function findOrCreateSubfolder(token: string, parentFolderId: string, name: string): Promise<string> {
+  const escaped = name.replace(/'/g, "\\'");
+  const searchResponse = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${escaped}' and mimeType='application/vnd.google-apps.folder' and trashed=false and '${parentFolderId}' in parents`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+  const searchData = await searchResponse.json();
+
+  if (searchData.files?.length > 0) {
+    return searchData.files[0].id;
+  }
+
+  const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+    }),
+  });
+  const createData = await createResponse.json();
+  return createData.id;
+}
+
 export async function listBackupFiles(
   token: string,
   folderId: string

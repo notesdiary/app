@@ -1,4 +1,6 @@
+import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { setActiveProjectDb } from '../lib/db';
 
 /**
  * Scheduled sync fans out one getAccessToken() call per filter rule
@@ -15,11 +17,8 @@ describe('googleAuth concurrent getAccessToken calls', () => {
   beforeEach(() => {
     oauthCallback = null;
 
-    (globalThis as any).localStorage = {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-    };
+    // Isolate each test with a unique IndexedDB instance
+    setActiveProjectDb('test-db-' + Math.random().toString(36).substring(7));
 
     requestAccessTokenSpy = vi.fn();
     initTokenClientSpy = vi.fn((config: any) => {
@@ -41,7 +40,9 @@ describe('googleAuth concurrent getAccessToken calls', () => {
     const results = Promise.all([getAccessToken(), getAccessToken(), getAccessToken()]);
 
     // Only one underlying OAuth token request should have been issued.
-    expect(requestAccessTokenSpy).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(requestAccessTokenSpy).toHaveBeenCalledTimes(1);
+    });
 
     oauthCallback!({ access_token: 'shared-token' });
 

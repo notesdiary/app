@@ -1,4 +1,6 @@
+import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { setActiveProjectDb } from '../lib/db';
 
 /**
  * Integration test for Google Auth sequential requests.
@@ -13,16 +15,6 @@ describe('googleAuth sequential requests integration', () => {
   beforeEach(() => {
     // Reset
     oauthCallback = null;
-
-    // Mock localStorage
-    (globalThis as any).localStorage = {
-      getItem: vi.fn(() => null),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-      length: 0,
-      key: vi.fn(),
-    };
 
     // Mock window.google with a token client that can be manually triggered
     mockTokenClient = {
@@ -50,6 +42,9 @@ describe('googleAuth sequential requests integration', () => {
   });
 
   it('second requestAccessToken call should resolve correctly (callback closure bug fix)', async () => {
+    // Set up isolated IndexedDB for this test
+    setActiveProjectDb('test-db-1');
+
     const { requestAccessToken } = await import('../lib/googleAuth');
 
     // Start first request

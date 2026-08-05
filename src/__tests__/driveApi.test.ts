@@ -8,6 +8,7 @@ import {
   createAnyonePermission,
   updatePermission,
   deletePermission,
+  findOrCreateSubfolder,
 } from '../lib/driveApi';
 import { Entry } from '../types';
 
@@ -391,6 +392,112 @@ describe('driveApi', () => {
       await expect(
         deletePermission(mockToken, mockFileId, mockPermissionId)
       ).rejects.toThrow('Failed to delete permission: Not Found');
+    });
+  });
+
+  describe('findOrCreateSubfolder', () => {
+    const mockToken = 'test-token';
+    const mockParentFolderId = 'parent-folder-123';
+    const mockSubfolderName = 'Test Subfolder';
+
+    it('returns existing subfolder id without creating a duplicate', async () => {
+      const mockExistingFolderId = 'existing-subfolder-456';
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          files: [{ id: mockExistingFolderId, name: mockSubfolderName }],
+        }),
+      });
+      (globalThis as any).fetch = mockFetch;
+
+      const result = await findOrCreateSubfolder(mockToken, mockParentFolderId, mockSubfolderName);
+
+      expect(result).toBe(mockExistingFolderId);
+      expect(mockFetch).toHaveBeenCalledOnce();
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toContain('googleapis.com/drive/v3/files');
+      expect(callArgs[1].method).toBeUndefined(); // GET request (no method specified means GET)
+      expect(callArgs[1].headers?.Authorization).toBe('Bearer test-token');
+    });
+
+    it('creates new subfolder when no match is found', async () => {
+      const mockNewFolderId = 'new-subfolder-789';
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ files: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ id: mockNewFolderId }),
+        });
+      (globalThis as any).fetch = mockFetch;
+
+      const result = await findOrCreateSubfolder(mockToken, mockParentFolderId, mockSubfolderName);
+
+      expect(result).toBe(mockNewFolderId);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+
+      // Verify search call (first call)
+      const searchCallArgs = mockFetch.mock.calls[0];
+      expect(searchCallArgs[0]).toContain('googleapis.com/drive/v3/files');
+
+      // Verify create call (second call)
+      const createCallArgs = mockFetch.mock.calls[1];
+      expect(createCallArgs[0]).toContain('googleapis.com/drive/v3/files');
+      expect(createCallArgs[1].method).toBe('POST');
+      expect(createCallArgs[1].headers?.Authorization).toBe('Bearer test-token');
+
+      const createBody = JSON.parse(createCallArgs[1].body);
+      expect(createBody).toEqual({
+        name: mockSubfolderName,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [mockParentFolderId],
+      });
+    });
+
+    it('includes parentFolderId in search query to scope results', async () => {
+      const mockFolderId = 'scoped-folder-999';
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          files: [{ id: mockFolderId, name: mockSubfolderName }],
+        }),
+      });
+      (globalThis as any).fetch = mockFetch;
+
+      await findOrCreateSubfolder(mockToken, mockParentFolderId, mockSubfolderName);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const searchUrl = callArgs[0];
+
+      // Verify the search query includes the parentFolderId in the parents clause
+      expect(searchUrl).toContain(`'${mockParentFolderId}' in parents`);
+      // Also verify it searches for the correct name and folder mimeType
+      expect(searchUrl).toContain(`name='${mockSubfolderName}'`);
+      expect(searchUrl).toContain("mimeType='application/vnd.google-apps.folder'");
+      expect(searchUrl).toContain('trashed=false');
+    });
+
+    it('escapes single quotes in folder name', async () => {
+      const nameWithQuote = "My' Folder";
+      const mockFolderId = 'folder-with-quote';
+      const mockFetch = vi.fn().mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          files: [{ id: mockFolderId }],
+        }),
+      });
+      (globalThis as any).fetch = mockFetch;
+
+      await findOrCreateSubfolder(mockToken, mockParentFolderId, nameWithQuote);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const searchUrl = callArgs[0];
+
+      // Verify the single quote is escaped in the search query
+      expect(searchUrl).toContain("My\\' Folder");
     });
   });
 });

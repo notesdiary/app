@@ -45,18 +45,18 @@ export function AboutView(props: AboutViewProps) {
           </div>
 
           <div className="about-section">
-            <h3 className="about-subsection-title">Separate profiles (work, personal, etc.)</h3>
+            <h3 className="about-subsection-title">Multiple projects (work, personal, etc.)</h3>
             <p className="about-text">
-              Keep different sets of notes completely separate by using browser profiles:
+              Keep different sets of notes completely separate by creating multiple projects:
             </p>
             <ul className="about-list">
-              <li>Create a browser profile for work — use it for work notes synced to your work Google Drive</li>
-              <li>Create another profile for personal — use it for personal notes synced to your personal Google Drive</li>
-              <li>Each profile has its own local storage and can connect to a different Google account</li>
-              <li>Switch between profiles to keep contexts completely isolated</li>
+              <li>Create a project for work — store work notes with their own settings and Drive connection</li>
+              <li>Create another project for personal — keep personal notes in a separate space</li>
+              <li>Each project has its own local storage, settings, and can sync to a different Google Drive account</li>
+              <li>Switch between projects instantly without changing browser profiles</li>
             </ul>
             <p className="about-text">
-              This approach keeps your work and personal notes in completely separate spaces with no cross-contamination.
+              This approach keeps your work and personal notes in completely separate spaces with no cross-contamination — all in one browser.
             </p>
           </div>
 
@@ -85,7 +85,7 @@ export function AboutView(props: AboutViewProps) {
               <li>✓ Limited Drive access — only files created by this app</li>
               <li>✓ Authentication stored only in your browser</li>
               <li>✓ Share selectively via filters and Google Drive</li>
-              <li>✓ Separate profiles for work, personal, and more</li>
+              <li>✓ Multiple projects for work, personal, and more</li>
               <li>✓ No tracking, no analytics, no ads</li>
             </ul>
           </div>

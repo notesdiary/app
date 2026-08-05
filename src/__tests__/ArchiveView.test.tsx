@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import 'fake-indexeddb/auto';
 import { ArchiveView } from '../components/ArchiveView';
-import { initDB, getDB } from '../lib/db';
+import { initDB, getDB, setActiveProjectDb } from '../lib/db';
 import {
   createEntry,
   archiveEntry,
@@ -12,6 +12,7 @@ import {
 
 describe('ArchiveView', () => {
   beforeEach(async () => {
+    setActiveProjectDb('test-ArchiveView-db');
     // Clear any previous DB state
     const db = await getDB();
     const tx = db.transaction('entries', 'readwrite');

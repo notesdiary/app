@@ -38,3 +38,21 @@ export async function setFilterSyncState(state: Record<string, FileSyncState>): 
   const db = await getDB();
   await db.put('meta', state, FILTER_SYNC_STATE_KEY);
 }
+
+const OAUTH_TOKEN_KEY = 'oauth-token';
+
+export async function getOAuthToken(): Promise<any | null> {
+  const db = await getDB();
+  const token = await db.get('meta', OAUTH_TOKEN_KEY);
+  return (token as any) ?? null;
+}
+
+export async function setOAuthToken(token: any): Promise<void> {
+  const db = await getDB();
+  await db.put('meta', token, OAUTH_TOKEN_KEY);
+}
+
+export async function clearOAuthToken(): Promise<void> {
+  const db = await getDB();
+  await db.delete('meta', OAUTH_TOKEN_KEY);
+}

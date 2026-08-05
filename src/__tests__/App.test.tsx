@@ -6,15 +6,25 @@ import * as metaRepo from '../lib/metaRepo';
 import * as googleAuth from '../lib/googleAuth';
 import * as driveApi from '../lib/driveApi';
 
+const TEST_PROJECT = vi.hoisted(() => ({ id: 'proj-test', name: 'Test Project', dbName: 'test-App-db', createdAt: 0 }));
+
 // Mock all the dependencies
 vi.mock('../lib/entriesRepo');
 vi.mock('../lib/metaRepo');
 vi.mock('../lib/googleAuth');
 vi.mock('../lib/driveApi');
+vi.mock('../lib/projectRegistry', () => ({
+  listProjects: vi.fn(async () => [TEST_PROJECT]),
+  migrateLegacyDbIfNeeded: vi.fn(async () => {}),
+  createProject: vi.fn(),
+  deleteProject: vi.fn(),
+  getProject: vi.fn(async () => TEST_PROJECT),
+}));
 
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.location.hash = `#/project/${TEST_PROJECT.id}`;
   });
 
   describe('Filter rules auto-seeding', () => {

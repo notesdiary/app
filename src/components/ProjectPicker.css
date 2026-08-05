@@ -1,0 +1,265 @@
+.project-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: #f7f8f9;
+  padding: 64px 24px 24px;
+  gap: 32px;
+  overflow-y: auto;
+}
+
+/* Project list section */
+.project-list-section {
+  width: 100%;
+  max-width: 480px;
+  min-width: 0;
+}
+
+.project-list-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: #1a1a1a;
+}
+
+.no-projects-message {
+  font-size: 14px;
+  color: #666;
+  margin: 24px 0 0 0;
+  font-style: italic;
+}
+
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: all 200ms;
+}
+
+.project-item:hover {
+  background: #f0f7fa;
+  border-color: #00a9ce;
+}
+
+.project-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.project-name {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 4px 0;
+  color: #1a1a1a;
+  word-break: break-word;
+}
+
+.project-meta {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.project-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
+  flex-shrink: 0;
+}
+
+.project-button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.project-open-button {
+  background: #00a9ce;
+  color: white;
+}
+
+.project-open-button:hover:not(:disabled) {
+  background: #0089a8;
+}
+
+.project-delete-button {
+  background: #f0f0f0;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+.project-delete-button:hover:not(:disabled) {
+  background: #e8e8e8;
+  color: #333;
+  border-color: #ccc;
+}
+
+.project-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Create project section */
+.create-project-section {
+  width: 100%;
+  max-width: 480px;
+  flex-shrink: 0;
+  padding-top: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.create-project-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: #1a1a1a;
+}
+
+.create-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.create-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: border-color 200ms;
+}
+
+.create-input:focus {
+  outline: none;
+  border-color: #00a9ce;
+  box-shadow: 0 0 0 2px rgba(0, 169, 206, 0.1);
+}
+
+.create-input:disabled {
+  background: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.create-button {
+  padding: 10px 20px;
+  background: #00a9ce;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  white-space: nowrap;
+}
+
+.create-button:hover:not(:disabled) {
+  background: #0089a8;
+}
+
+.create-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.create-error {
+  color: #d32f2f;
+  font-size: 13px;
+  margin: 8px 0 0 0;
+  padding: 8px 12px;
+  background: #ffebee;
+  border-radius: 4px;
+  border-left: 3px solid #d32f2f;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .project-picker {
+    background: #1a1a1a;
+  }
+
+  .project-list-title,
+  .create-project-title,
+  .project-name {
+    color: #e0e0e0;
+  }
+
+  .no-projects-message,
+  .project-meta {
+    color: #999;
+  }
+
+  .project-item {
+    background: #2a2a2a;
+    border-color: #333;
+  }
+
+  .project-item:hover {
+    background: #333;
+    border-color: #00a9ce;
+  }
+
+  .project-delete-button {
+    background: #333;
+    color: #999;
+    border-color: #444;
+  }
+
+  .project-delete-button:hover:not(:disabled) {
+    background: #3a3a3a;
+    color: #ccc;
+    border-color: #555;
+  }
+
+  .create-input {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #444;
+  }
+
+  .create-input:focus {
+    border-color: #00a9ce;
+    box-shadow: 0 0 0 2px rgba(0, 169, 206, 0.2);
+  }
+
+  .create-input:disabled {
+    background: #333;
+    color: #666;
+  }
+
+  .create-error {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.1);
+    border-left-color: #ff6b6b;
+  }
+
+  .project-list-section {
+    border-top-color: #333;
+  }
+
+  .create-project-section {
+    border-top-color: #333;
+  }
+}

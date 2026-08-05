@@ -11,6 +11,7 @@ interface LeftRailProps {
   onSettingsClick: () => void;
   onArchiveClick: () => void;
   onAboutClick: () => void;
+  onSwitchProjectClick: () => void;
   isMobile: boolean;
   isOpen: boolean;
 }
@@ -114,6 +115,17 @@ export function LeftRail(props: LeftRailProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
+            </svg>
+          </button>
+          <button
+            className="nav-icon-button"
+            aria-label="Switch Project"
+            title="Switch Project"
+            onClick={props.onSwitchProjectClick}
+          >
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M2 4H7V3H2C1.4 3 1 3.4 1 4V9H2V4Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M13 6L10 3M13 6L10 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
