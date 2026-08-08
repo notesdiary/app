@@ -4,9 +4,9 @@ import { getTodayISO } from './lib/dateUtils';
 import { deriveMode } from './lib/mode';
 import { filterEntries, filterParagraphsInEntry } from './lib/entryFiltering';
 import { listAllEntries, createEntry, updateEntryText, archiveEntry, putEntries, countArchivedEntries } from './lib/entriesRepo';
-import { getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState } from './lib/metaRepo';
-import { getAccessToken, requestAccessToken, revokeToken, getAuthStatus } from './lib/googleAuth';
-import { findOrCreateAppFolder, findOrCreateSubfolder, listBackupFiles, uploadNamedFile, deleteFile, ensureJsonExtension, downloadFileContent, DrivePermission, listPermissions, createPermission, createAnyonePermission, updatePermission, deletePermission } from './lib/driveApi';
+import { getDriveMeta, setDriveMeta, getFilterRules, setFilterRules, getFilterSyncState, setFilterSyncState, cleanupLegacyOAuthToken } from './lib/metaRepo';
+import { drive, ensureProjectFolderId, ensureJsonExtension, DrivePermission } from './lib/drive';
+import type { ProjectHandle } from '@open-webapp/drive-sync';
 import { setActiveProjectDb } from './lib/db';
 import { listProjects, createProject, deleteProject, getProject, migrateLegacyDbIfNeeded } from './lib/projectRegistry';
 import { useHashRoute } from './hooks/useHashRoute';
@@ -23,6 +23,24 @@ import './App.css';
 
 type ViewType = 'diary' | 'settings' | 'archive' | 'about';
 
+/**
+ * Reads a Drive JSON backup file's entries. Mirrors driveApi.ts's old
+ * downloadFileContent + Array.isArray(...) ? ... : [] contract: a missing
+ * file (files.read() returns null on 404), a non-text (Blob) result, or
+ * unparsable/non-array content are all treated the same as "no entries",
+ * rather than thrown.
+ */
+async function readEntriesFile(project: ProjectHandle, fileId: string): Promise<Entry[]> {
+  const content = await project.files.read(fileId);
+  if (typeof content !== 'string') return [];
+  try {
+    const parsed = JSON.parse(content);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function App() {
   // State: projects and active project
   const [projects, setProjects] = useState<Project[]>([]);
@@ -36,7 +54,11 @@ function App() {
   const [driveConnected, setDriveConnected] = useState(false);
   const [driveAccount, setDriveAccount] = useState<string | undefined>();
   const [driveFolderId, setDriveFolderId] = useState<string | undefined>();
-  const [driveToken, setDriveToken] = useState<string | undefined>();
+  // True when the connected account's granted OAuth scopes no longer cover
+  // everything drive-sync requires (e.g. an existing connection made before
+  // this app additionally required the userinfo.email scope). Computed
+  // locally by getConnection() — no network call.
+  const [needsReauth, setNeedsReauth] = useState(false);
 
   // State: filter sync rules
   const [filterRules, setFilterRulesLocal] = useState<FilterRule[]>([]);
@@ -61,13 +83,39 @@ function App() {
   const isMobile = width < 960;
   const [leftOpen, setLeftOpen] = useState(true);
 
+  // Activate drive-sync's background token-refresh listeners once, for the
+  // life of the app. Disposed on unmount.
+  useEffect(() => {
+    console.log('[Drive] Activating background token-refresh listeners');
+    let dispose: (() => void) | undefined;
+    try {
+      dispose = drive.activate();
+    } catch (error) {
+      console.error('[Drive] Failed to activate:', error);
+    }
+    return () => {
+      if (dispose) {
+        try {
+          dispose();
+        } catch (error) {
+          console.error('[Drive] Error disposing listeners:', error);
+        }
+      }
+    };
+  }, []);
+
   // Load projects from registry on mount
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   useEffect(() => {
     (async () => {
       await migrateLegacyDbIfNeeded();
-      setProjects(await listProjects());
+      const loadedProjects = await listProjects();
+      setProjects(loadedProjects);
       setProjectsLoaded(true);
+      // Drops any per-project auth IndexedDB databases drive-sync is still
+      // holding onto for projects that no longer exist in the registry
+      // (e.g. deleted while the app was closed, or via another device).
+      await drive.reconcile(loadedProjects.map((p) => p.id));
     })();
   }, []);
 
@@ -79,6 +127,11 @@ function App() {
     if (!activeProject) return;
 
     (async () => {
+      // One-time cleanup of the legacy oauth-token meta key, now owned by
+      // drive-sync's own (separate) IndexedDB storage. Runs per-project
+      // since each project has its own 'meta' store.
+      await cleanupLegacyOAuthToken();
+
       const allEntries = await listAllEntries();
       setEntries(allEntries);
       setArchivedCount(await countArchivedEntries());
@@ -88,6 +141,17 @@ function App() {
       setDriveConnected(driveMeta.driveConnected);
       if (driveMeta.driveAccount) setDriveAccount(driveMeta.driveAccount);
       if (driveMeta.driveFolderId) setDriveFolderId(driveMeta.driveFolderId);
+
+      // Proactively detect whether the connected account's granted scopes
+      // are missing a now-required scope (e.g. userinfo.email, added after
+      // this account first connected). Purely local — getConnection() makes
+      // no network call.
+      if (driveMeta.driveConnected) {
+        const connection = await drive.project(activeProject.id).getConnection();
+        setNeedsReauth(connection?.needsReauth ?? false);
+      } else {
+        setNeedsReauth(false);
+      }
 
       // Load filter rules and sync state
       let rules = await getFilterRules();
@@ -112,35 +176,32 @@ function App() {
 
     const intervalId = setInterval(async () => {
       try {
+        console.log('[Sync] Auto-sync starting...');
         await syncAllNow();
+        console.log('[Sync] Auto-sync completed');
       } catch (error) {
-        console.error('Auto-sync failed:', error);
+        console.error('[Sync] Auto-sync failed:', error);
       }
     }, 5 * 60 * 1000); // 5 minutes
 
     return () => clearInterval(intervalId);
   }, [driveConnected, filterRules]);
 
-  // Verify and maintain Drive connection, attempt silent reconnect if needed
+  // Periodically re-check (locally — no network call) whether the connected
+  // account's scopes still cover everything drive-sync requires. Actual
+  // background token refresh (the old checkConnection's real purpose) is
+  // now handled by drive.activate()'s visibilitychange/pageshow listeners.
   useEffect(() => {
-    if (!driveConnected) return;
+    if (!driveConnected || !activeProject) return;
 
-    const checkConnection = async () => {
-      try {
-        // Attempt to get a valid token (silent refresh if needed)
-        await getAccessToken();
-      } catch (error) {
-        // Connection lost, mark as disconnected
-        console.warn('Drive connection lost:', error);
-        setDriveConnected(false);
-        await setDriveMeta({ driveConnected: false });
-      }
+    const checkNeedsReauth = async () => {
+      const connection = await drive.project(activeProject.id).getConnection();
+      setNeedsReauth(connection?.needsReauth ?? false);
     };
 
-    // Check every 1 minute
-    const intervalId = setInterval(checkConnection, 60 * 1000);
+    const intervalId = setInterval(checkNeedsReauth, 60 * 1000);
     return () => clearInterval(intervalId);
-  }, [driveConnected]);
+  }, [driveConnected, activeProject?.id]);
 
   // Derive the current mode
   const mode = deriveMode(searchQuery, selectedTags);
@@ -173,10 +234,9 @@ function App() {
 
   const removeFilterRule = async (id: string, alsoDeleteFromDrive: boolean) => {
     // If requested, delete from Drive
-    if (alsoDeleteFromDrive && filterSyncState[id]?.driveFileId) {
+    if (alsoDeleteFromDrive && filterSyncState[id]?.driveFileId && activeProject) {
       try {
-        const token = await getAccessToken();
-        await deleteFile(token, filterSyncState[id].driveFileId!);
+        await drive.project(activeProject.id).files.remove(filterSyncState[id].driveFileId!);
       } catch (error) {
         console.error(`Failed to delete filter rule ${id} from Drive:`, error);
       }
@@ -248,7 +308,7 @@ function App() {
       if (trimmed) {
         // Entry was updated
         const updatedEntries = entries.map(e =>
-          e.id === editingId ? { ...e, text: trimmed } : e
+            e.id === editingId ? { ...e, text: trimmed } : e
         );
         setEntries(updatedEntries);
       } else {
@@ -366,11 +426,18 @@ function App() {
 
   // Returns the current Drive folder ID, rediscovering and persisting it
   // if a prior connection never saved it (see setDriveMeta merge fix).
-  const ensureDriveFolderId = async (token: string): Promise<string> => {
+  const ensureDriveFolderId = async (): Promise<string> => {
     if (driveFolderId) {
       return driveFolderId;
     }
-    const folderId = await findOrCreateAppFolder(token);
+    if (!activeProject) {
+      throw new Error('activeProject is not set');
+    }
+    const folderId = await ensureProjectFolderId(
+        activeProject.id,
+        activeProject.name,
+        activeProject.dbName === 'notes-diary'
+    );
     setDriveFolderId(folderId);
     await setDriveMeta({ driveFolderId: folderId });
     return folderId;
@@ -383,6 +450,10 @@ function App() {
       console.error(`Rule not found: ${id}`);
       return;
     }
+    if (!activeProject) {
+      console.error('No active project to sync against');
+      return;
+    }
 
     // Set status to 'syncing' (local, do NOT persist mid-flight)
     setFilterSyncStateLocal(prev => ({
@@ -391,8 +462,18 @@ function App() {
     }));
 
     try {
-      const token = await getAccessToken();
-      const driveFolderId = await ensureDriveFolderId(token);
+      const project = drive.project(activeProject.id);
+
+      // Verify connection is still valid before attempting sync
+      const connection = await project.getConnection();
+      if (!connection) {
+        throw new Error('No active connection to Google Drive');
+      }
+      if (connection.needsReauth) {
+        setNeedsReauth(true);
+        throw new Error('Google Drive connection expired - re-authentication needed');
+      }
+      const driveFolderId = await ensureDriveFolderId();
       const localMatches = getFilterMatches(rule, entries);
       const fileName = rule.fileName;
 
@@ -409,14 +490,18 @@ function App() {
         // uploaded from another device) even though this browser never
         // recorded its file ID locally.
         const existingFilename = ensureJsonExtension(fileName);
-        const files = await listBackupFiles(token, driveFolderId);
-        driveFileId = files.find(f => f.name === existingFilename)?.id;
+        const files = await project.files.list({
+          folderId: driveFolderId,
+          mimeType: 'application/json',
+          nameEquals: existingFilename,
+        });
+        driveFileId = files[0]?.id;
       }
 
       if (driveFileId) {
         // File exists on Drive — union local with remote (local wins on id collision)
-        const remoteContent = await downloadFileContent(token, driveFileId);
-        const remoteEntries: Entry[] = Array.isArray(remoteContent) ? remoteContent : [];
+        console.log(`[Sync] Reading existing file ${driveFileId} for rule ${id}`);
+        const remoteEntries = await readEntriesFile(project, driveFileId);
         const remoteOnly = remoteEntries.filter(r => !localMatches.find(l => l.id === r.id));
         const merged = localMatches.concat(remoteOnly);
 
@@ -426,11 +511,24 @@ function App() {
           setEntries(prev => prev.concat(remoteOnly.filter(r => !prev.find(l => l.id === r.id))));
         }
 
-        await uploadNamedFile(token, driveFolderId, fileName, merged, driveFileId);
+        console.log(`[Sync] Writing merged data (${merged.length} entries) to file ${driveFileId}`);
+        await project.files.write({
+          fileId: driveFileId,
+          content: JSON.stringify(merged, null, 2),
+          mimeType: 'application/json',
+        });
       } else {
         // No remote file yet — create one with local matches
-        const fileId = await uploadNamedFile(token, driveFolderId, fileName, localMatches);
-        driveFileId = fileId;
+        const filename = ensureJsonExtension(fileName);
+        console.log(`[Sync] Creating new file "${filename}" for rule ${id} with ${localMatches.length} entries`);
+        const file = await project.files.write({
+          folderId: driveFolderId,
+          name: filename,
+          content: JSON.stringify(localMatches, null, 2),
+          mimeType: 'application/json',
+        });
+        driveFileId = file.id;
+        console.log(`[Sync] Created file ${driveFileId}`);
       }
 
       // Mark as synced with timestamp
@@ -447,7 +545,15 @@ function App() {
       // Persist sync state
       await setFilterSyncState(nextFilterSyncState);
     } catch (error) {
-      console.error(`Failed to sync filter rule ${id}:`, error);
+      const errorMsg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      console.error(`Failed to sync filter rule ${id}: ${errorMsg}`, error);
+
+      // If token refresh failed, mark as needing re-auth so UI can prompt user
+      if (error instanceof Error && (error.name === 'NeedsReauthError' || error.message.includes('re-authentication'))) {
+        console.warn(`[Sync] Token issue detected for rule ${id}, marking as needing re-auth`);
+        setNeedsReauth(true);
+      }
+
       // Leave status as-is — user can retry
     }
   };
@@ -463,44 +569,45 @@ function App() {
   };
 
   const loadSharePermissions = async (fileId: string): Promise<DrivePermission[]> => {
-    const token = await getAccessToken();
-    return listPermissions(token, fileId);
+    if (!activeProject) return [];
+    return drive.project(activeProject.id).permissions.list(fileId);
   };
 
   const invitePerson = async (fileId: string, email: string, role: string): Promise<DrivePermission> => {
-    const token = await getAccessToken();
-    return createPermission(token, fileId, { emailAddress: email, role });
+    if (!activeProject) throw new Error('No active project');
+    return drive.project(activeProject.id).permissions.grant({ fileId, type: 'user', role, emailAddress: email });
   };
 
   const changePersonRole = async (fileId: string, permissionId: string, role: string): Promise<DrivePermission> => {
-    const token = await getAccessToken();
-    return updatePermission(token, fileId, permissionId, role);
+    if (!activeProject) throw new Error('No active project');
+    return drive.project(activeProject.id).permissions.update({ fileId, permissionId, role });
   };
 
   const removePerson = async (fileId: string, permissionId: string): Promise<void> => {
-    const token = await getAccessToken();
-    return deletePermission(token, fileId, permissionId);
+    if (!activeProject) return;
+    return drive.project(activeProject.id).permissions.revoke({ fileId, permissionId });
   };
 
   const changeGeneralAccess = async (
-    fileId: string,
-    access: 'restricted' | 'anyone',
-    role: string,
-    currentGeneralPermissionId?: string
+      fileId: string,
+      access: 'restricted' | 'anyone',
+      role: string,
+      currentGeneralPermissionId?: string
   ): Promise<DrivePermission | void> => {
-    const token = await getAccessToken();
+    if (!activeProject) throw new Error('No active project');
+    const project = drive.project(activeProject.id);
     if (access === 'anyone') {
-      return createAnyonePermission(token, fileId, role);
+      return project.permissions.grant({ fileId, type: 'anyone', role });
     }
     if (!currentGeneralPermissionId) {
       throw new Error('Cannot restrict access: no existing general permission id provided');
     }
-    return deletePermission(token, fileId, currentGeneralPermissionId);
+    return project.permissions.revoke({ fileId, permissionId: currentGeneralPermissionId });
   };
 
   const changeGeneralRole = async (fileId: string, permissionId: string, role: string): Promise<DrivePermission> => {
-    const token = await getAccessToken();
-    return updatePermission(token, fileId, permissionId, role);
+    if (!activeProject) throw new Error('No active project');
+    return drive.project(activeProject.id).permissions.update({ fileId, permissionId, role });
   };
 
   // Project handlers
@@ -514,28 +621,28 @@ function App() {
     setProjects(await listProjects());
   };
 
-  const handleDiscoverDriveFolder = async (token: string) => {
+  /**
+   * Discovers (or creates) this project's Drive folder and pulls down any
+   * backup files already there that a filter rule doesn't yet have a
+   * driveFileId for. Preserves the pre-migration layout via
+   * `ensureProjectFolderId` (see drive.ts): a per-project subfolder under
+   * "Notes Diary", except the legacy migrated project, which uses the
+   * top-level folder directly.
+   */
+  const handleDiscoverDriveFolder = async () => {
+    if (!activeProject) return;
     try {
-      const topLevelFolderId = await findOrCreateAppFolder(token);
-
-      // Branch behavior based on whether project is migrated or new
-      let driveFolderId: string;
-      if (activeProject?.dbName === 'notes-diary') {
-        // Migrated project: use top-level folder directly
-        driveFolderId = topLevelFolderId;
-      } else {
-        // New project: create a subfolder with the project name
-        if (!activeProject) {
-          throw new Error('activeProject is not set');
-        }
-        const subfolderFolderId = await findOrCreateSubfolder(token, topLevelFolderId, activeProject.name);
-        driveFolderId = subfolderFolderId;
-      }
+      const project = drive.project(activeProject.id);
+      const driveFolderId = await ensureProjectFolderId(
+          activeProject.id,
+          activeProject.name,
+          activeProject.dbName === 'notes-diary'
+      );
 
       setDriveFolderId(driveFolderId);
       await setDriveMeta({ driveFolderId });
 
-      const files = await listBackupFiles(token, driveFolderId);
+      const files = await project.files.list({ folderId: driveFolderId, mimeType: 'application/json' });
 
       // Build a map of fileName -> file for quick lookup
       const fileMap = new Map(files.map(f => [f.name, f]));
@@ -548,10 +655,9 @@ function App() {
         const file = fileMap.get(fileName);
 
         // If file exists on Drive and we don't have its driveFileId yet, download it
-        if (file && !filterSyncState[rule.id]?.driveFileId) {
+        if (file?.id && !filterSyncState[rule.id]?.driveFileId) {
           try {
-            const remoteContent = await downloadFileContent(token, file.id);
-            const remoteEntries: Entry[] = Array.isArray(remoteContent) ? remoteContent : [];
+            const remoteEntries = await readEntriesFile(project, file.id);
 
             // Merge: union-by-id, local-wins on collision
             const localIds = new Set(entries.map(e => e.id));
@@ -584,63 +690,76 @@ function App() {
   };
 
   const connectDrive = async () => {
+    if (!activeProject) {
+      throw new Error('No active project');
+    }
     try {
-      // Request access token with consent prompt (first connection)
-      const token = await requestAccessToken('consent');
+      // Interactive connect (prompts for consent on first connection, or to
+      // re-grant scopes on a reconnect).
+      const connection = await drive.project(activeProject.id).connect();
 
-      // Fetch authenticated user's email from Drive API
-      const response = await fetch(
-        'https://www.googleapis.com/drive/v3/about?fields=user',
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Drive API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      const email = data.user?.emailAddress;
-
-      if (!email) {
-        throw new Error('Could not fetch user email from Drive');
-      }
-
-      // Store in state (token in memory only, not persisted)
       setDriveConnected(true);
-      setDriveAccount(email);
-      setDriveToken(token);
+      setDriveAccount(connection.email);
+      setNeedsReauth(connection.needsReauth);
 
-      // Persist connection metadata (but not the token)
+      // Persist connection metadata (the token itself lives in drive-sync's
+      // own storage, not here).
       await setDriveMeta({
         driveConnected: true,
-        driveAccount: email,
+        driveAccount: connection.email,
       });
 
+      // Verify the connection is working by doing a simple folder lookup.
+      // This ensures the token is properly stored and can be used.
+      try {
+        const project = drive.project(activeProject.id);
+
+        // Give the library a moment to finalize token storage
+        // before we try to use the connection
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const driveFolderId = await ensureProjectFolderId(
+          activeProject.id,
+          activeProject.name,
+          activeProject.dbName === 'notes-diary'
+        );
+        setDriveFolderId(driveFolderId);
+
+        console.log('[Drive] Connection verified and token is usable');
+      } catch (folderError) {
+        console.error('[Drive] Failed to verify connection:', folderError);
+        throw new Error('Connected to Google account but could not access Drive. Please reconnect.');
+      }
+
       // Discover existing Drive folder and sync state
-      await handleDiscoverDriveFolder(token);
+      await handleDiscoverDriveFolder();
     } catch (error) {
       console.error('Failed to connect Drive:', error);
       // Revert any partial state
       setDriveConnected(false);
       setDriveAccount(undefined);
-      setDriveToken(undefined);
       throw error;
     }
   };
 
+  // Re-runs the interactive connect flow against the already-active
+  // project, to pick up newly-required scopes (see needsReauth banner).
+  const reconnectDrive = async () => {
+    await connectDrive();
+  };
+
   const disconnectDrive = async () => {
+    if (!activeProject) return;
     try {
-      if (driveToken) {
-        await revokeToken(driveToken);
-      }
+      // disconnect() only revokes if a token is actually cached, so no
+      // need to track/check a driveToken here anymore.
+      await drive.project(activeProject.id).disconnect();
 
       // Clear connection state
       setDriveConnected(false);
       setDriveAccount(undefined);
       setDriveFolderId(undefined);
-      setDriveToken(undefined);
+      setNeedsReauth(false);
 
       // Clear Drive file IDs from filterSyncState
       const clearedFilterSyncState: Record<string, FileSyncState> = {};
@@ -677,93 +796,95 @@ function App() {
   // If on picker route, show ProjectPicker instead of the shell
   if (route.name === 'picker') {
     return (
-      <div className="app-layout">
-        <ProjectPicker
-          projects={projects}
-          onCreate={handleCreateProject}
-          onDelete={handleDeleteProject}
-          onOpen={navigateToProject}
-        />
-      </div>
+        <div className="app-layout">
+          <ProjectPicker
+              projects={projects}
+              onCreate={handleCreateProject}
+              onDelete={handleDeleteProject}
+              onOpen={navigateToProject}
+          />
+        </div>
     );
   }
 
   return (
-    <div className="app-layout">
-      <LeftRail
-        entries={entries}
-        selectedTags={selectedTags}
-        onTagClick={handleTagClick}
-        archivedCount={archivedCount}
-        onSettingsClick={handleSettingsClick}
-        onArchiveClick={handleArchiveClick}
-        onAboutClick={handleAboutClick}
-        onSwitchProjectClick={handleSwitchProject}
-        isMobile={isMobile}
-        isOpen={leftOpen}
-      />
-
-      <main className="main-content">
-        {view === 'diary' && (
-          <DiaryView
-            entries={filteredEntries}
-            searchQuery={searchQuery}
+      <div className="app-layout">
+        <LeftRail
+            entries={entries}
             selectedTags={selectedTags}
-            composerText={composerText}
-            editingId={editingId}
-            editText={draftText}
-            mode={mode}
-            onSearchChange={(q) => {
-              setSearchQuery(q);
-              setEditingId(null);
-            }}
-            onComposerTextChange={setComposerText}
-            onComposerBlur={handleComposerBlur}
-            onEditTextChange={setDraftText}
-            onEditSave={handleEditSave}
             onTagClick={handleTagClick}
-            onEntryRemove={handleEntryRemove}
-            onEntryClickToEdit={handleEntryClickToEdit}
-            onHamburgerClick={handleHamburgerClick}
-          />
-        )}
-        {view === 'settings' && (
-          <SettingsView
-            driveConnected={driveConnected}
-            driveAccount={driveAccount}
-            filterRules={filterRules}
-            filterSyncState={filterSyncState}
-            filterMatchCounts={Object.fromEntries(filterRules.map(r => [r.id, getFilterMatches(r, entries).length]))}
-            onConnectDrive={connectDrive}
-            onDisconnectDrive={disconnectDrive}
-            onSyncAllNow={syncAllNow}
-            onAddFilterRule={addFilterRule}
-            onAddRemainderRule={addRemainderRule}
-            onUpdateFilterRule={updateFilterRule}
-            onRemoveFilterRule={removeFilterRule}
-            onSyncFilterRule={syncFilterRule}
-            onLoadSharePermissions={loadSharePermissions}
-            onInvitePerson={invitePerson}
-            onChangePersonRole={changePersonRole}
-            onRemovePerson={removePerson}
-            onChangeGeneralAccess={changeGeneralAccess}
-            onChangeGeneralRole={changeGeneralRole}
-            onBack={() => setView('diary')}
-          />
-        )}
-        {view === 'archive' && (
-          <ArchiveView
-            onBackClick={async () => {
-              setView('diary');
-              setArchivedCount(await countArchivedEntries());
-            }}
-          />
-        )}
-        {view === 'about' && <AboutView onBack={() => setView('diary')} />}
-      </main>
+            archivedCount={archivedCount}
+            onSettingsClick={handleSettingsClick}
+            onArchiveClick={handleArchiveClick}
+            onAboutClick={handleAboutClick}
+            onSwitchProjectClick={handleSwitchProject}
+            isMobile={isMobile}
+            isOpen={leftOpen}
+        />
 
-      {showBackdrop && <Backdrop onClose={closeAllDrawers} />}
-    </div>
+        <main className="main-content">
+          {view === 'diary' && (
+              <DiaryView
+                  entries={filteredEntries}
+                  searchQuery={searchQuery}
+                  selectedTags={selectedTags}
+                  composerText={composerText}
+                  editingId={editingId}
+                  editText={draftText}
+                  mode={mode}
+                  onSearchChange={(q) => {
+                    setSearchQuery(q);
+                    setEditingId(null);
+                  }}
+                  onComposerTextChange={setComposerText}
+                  onComposerBlur={handleComposerBlur}
+                  onEditTextChange={setDraftText}
+                  onEditSave={handleEditSave}
+                  onTagClick={handleTagClick}
+                  onEntryRemove={handleEntryRemove}
+                  onEntryClickToEdit={handleEntryClickToEdit}
+                  onHamburgerClick={handleHamburgerClick}
+              />
+          )}
+          {view === 'settings' && (
+              <SettingsView
+                  driveConnected={driveConnected}
+                  driveAccount={driveAccount}
+                  needsReauth={needsReauth}
+                  filterRules={filterRules}
+                  filterSyncState={filterSyncState}
+                  filterMatchCounts={Object.fromEntries(filterRules.map(r => [r.id, getFilterMatches(r, entries).length]))}
+                  onConnectDrive={connectDrive}
+                  onReconnectDrive={reconnectDrive}
+                  onDisconnectDrive={disconnectDrive}
+                  onSyncAllNow={syncAllNow}
+                  onAddFilterRule={addFilterRule}
+                  onAddRemainderRule={addRemainderRule}
+                  onUpdateFilterRule={updateFilterRule}
+                  onRemoveFilterRule={removeFilterRule}
+                  onSyncFilterRule={syncFilterRule}
+                  onLoadSharePermissions={loadSharePermissions}
+                  onInvitePerson={invitePerson}
+                  onChangePersonRole={changePersonRole}
+                  onRemovePerson={removePerson}
+                  onChangeGeneralAccess={changeGeneralAccess}
+                  onChangeGeneralRole={changeGeneralRole}
+                  onBack={() => setView('diary')}
+              />
+          )}
+          {view === 'archive' && (
+              <ArchiveView
+                  onBackClick={async () => {
+                    setView('diary');
+                    setArchivedCount(await countArchivedEntries());
+                  }}
+              />
+          )}
+          {view === 'about' && <AboutView onBack={() => setView('diary')} />}
+        </main>
+
+        {showBackdrop && <Backdrop onClose={closeAllDrawers} />}
+      </div>
   );
 }
 

@@ -1,5 +1,6 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { Project } from '../types';
+import { drive } from './drive';
 
 const REGISTRY_DB_NAME = 'notes-diary-registry';
 let registryDb: Promise<IDBPDatabase<any>> | null = null;
@@ -47,6 +48,9 @@ export async function deleteProject(id: string): Promise<void> {
   const db = await getRegistryDb();
   await db.delete('projects', id);
   indexedDB.deleteDatabase(project.dbName);
+  // Drops the drive-sync library's own per-project auth IndexedDB database
+  // (a separate database from this app's `project.dbName`, deleted above).
+  await drive.dropProject(id);
 }
 
 export function _resetRegistryForTests(): void {

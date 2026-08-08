@@ -39,20 +39,24 @@ export async function setFilterSyncState(state: Record<string, FileSyncState>): 
   await db.put('meta', state, FILTER_SYNC_STATE_KEY);
 }
 
-const OAUTH_TOKEN_KEY = 'oauth-token';
+/**
+ * Legacy per-project token storage key, previously owned by the now-deleted
+ * googleAuth.ts (superseded by @open-webapp/drive-sync's own token storage,
+ * which uses its own IndexedDB databases rather than this app's 'meta'
+ * store). This key is no longer written, but a one-time boot cleanup
+ * (see cleanupLegacyOAuthToken) actively deletes any leftover value from
+ * existing installs rather than just leaving it to rot in place.
+ */
+const LEGACY_OAUTH_TOKEN_KEY = 'oauth-token';
 
-export async function getOAuthToken(): Promise<any | null> {
+/**
+ * One-time boot cleanup: removes the legacy oauth-token meta key from the
+ * CURRENT project's IndexedDB meta store, if present. Safe to call
+ * unconditionally on every boot (a no-op once the key is gone) — this app
+ * has one 'meta' store per project db, so this must run once per project db
+ * that's opened, not just once globally.
+ */
+export async function cleanupLegacyOAuthToken(): Promise<void> {
   const db = await getDB();
-  const token = await db.get('meta', OAUTH_TOKEN_KEY);
-  return (token as any) ?? null;
-}
-
-export async function setOAuthToken(token: any): Promise<void> {
-  const db = await getDB();
-  await db.put('meta', token, OAUTH_TOKEN_KEY);
-}
-
-export async function clearOAuthToken(): Promise<void> {
-  const db = await getDB();
-  await db.delete('meta', OAUTH_TOKEN_KEY);
+  await db.delete('meta', LEGACY_OAUTH_TOKEN_KEY);
 }
