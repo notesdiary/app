@@ -4,7 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="37b05a8f-5c27-4906-a1e8-02c8b0b5e226" name="Changes" comment="initial commit" />
+    <list default="true" id="37b05a8f-5c27-4906-a1e8-02c8b0b5e226" name="Changes" comment="Migrate to @open-webapp/drive-sync, restore per-project subfolders (Phase 5)&#10;Update user&#10;&#10;Replaces the forked src/lib/driveApi.ts (266 lines) and src/lib/&#10;googleAuth.ts (178 lines) with the published @open-webapp/drive-sync@^0.1.0&#10;library. src/lib/drive.ts holds the app-wide singleton (folderPath&#10;['Notes Diary'], pinned by a test against the library's own driveFake) plus&#10;ensureJsonExtension (no library equivalent).&#10;&#10;The library's frozen createDriveSync() factory takes one fixed folderPath&#10;per instance with no per-project argument, which would have flattened&#10;every project's backups into a single shared top-level folder — a real&#10;regression from the pre-migration behavior of nesting each project under&#10;its own named subfolder (except the legacy single-project app, which used&#10;the top-level folder directly). Restored via ensureProjectFolderId(): a&#10;second, short-lived createDriveSync() instance per resolution call with a&#10;project-scoped folderPath. This is safe because storage.ts's IndexedDB&#10;naming only keys off (appId, projectId), never folderPath, so multiple&#10;factory instances for the same project share one underlying token/&#10;connection store; only the app-wide `drive` singleton is ever .activate()'d.&#10;&#10;Also: re-consent banner for accounts with a drive.file-only grant (detected&#10;locally via getConnection().needsReauth, no network call), drive.dropProject&#10;wired into deleteProject, and the legacy oauth-token IndexedDB key removed&#10;from existing meta stores on boot (notes-diary-{id} DB names unchanged).&#10;&#10;Co-Authored-By: Claude Sonnet 5 &lt;noreply@anthropic.com&gt;">
+      <change beforePath="$PROJECT_DIR$/src/__tests__/googleAuth-integration.test.ts" beforeDir="false" />
+    </list>
+    <list id="cb167cb6-944b-477c-bf6f-f5d7331a07e0" name="do-not-checkin" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -17,7 +22,7 @@
     </option>
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="82" />
+    <option name="cachedIndexableFilesCount" value="99" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -40,61 +45,61 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="2.529419640350274" />
-      <entry key="MS500" value="4.12064305142766" />
-      <entry key="S2" value="4.747721560144296" />
-      <entry key="S5" value="4.89613280305112" />
-      <entry key="S10" value="4.9475589389527315" />
-      <entry key="S30" value="5.001636267751805" />
-      <entry key="S60" value="5.383760368288716" />
-      <entry key="M2" value="6.887613525717598" />
-      <entry key="M5" value="14.113604756329908" />
-      <entry key="M10" value="28.7911111696024" />
-      <entry key="M15" value="39.97053794586743" />
-      <entry key="M30" value="58.06046601555536" />
-      <entry key="H1" value="71.11606088271914" />
-      <entry key="H2" value="79.01042994158726" />
-      <entry key="H4" value="83.35851802357365" />
-      <entry key="D1" value="87.20515256598378" />
-      <entry key="W1" value="87.88591746472767" />
+      <entry key="MS100" value="2.092662417650663" />
+      <entry key="MS500" value="6.027692566301351" />
+      <entry key="S2" value="12.568597542570672" />
+      <entry key="S5" value="15.471022971376367" />
+      <entry key="S10" value="16.665996686840458" />
+      <entry key="S30" value="17.557211117090638" />
+      <entry key="S60" value="18.15138535953429" />
+      <entry key="M2" value="19.75464581541026" />
+      <entry key="M5" value="27.0289034230588" />
+      <entry key="M10" value="41.71682558212107" />
+      <entry key="M15" value="52.904796483328816" />
+      <entry key="M30" value="71.01447148767502" />
+      <entry key="H1" value="84.0883270772484" />
+      <entry key="H2" value="91.99513087569566" />
+      <entry key="H4" value="96.35047406547613" />
+      <entry key="D1" value="100.20375374832823" />
+      <entry key="W1" value="100.88571616323722" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
-      <entry key="MS500" value="5.958406751163953E-154" />
-      <entry key="S2" value="4.9406323393471315E-39" />
-      <entry key="S5" value="4.758970522028815E-16" />
-      <entry key="S10" value="2.181506479941972E-8" />
-      <entry key="S30" value="0.0027941657771041145" />
-      <entry key="S60" value="0.05285986924978261" />
-      <entry key="M2" value="0.2299127426868346" />
-      <entry key="M5" value="0.5554247355362952" />
-      <entry key="M10" value="0.7452682305964043" />
-      <entry key="M15" value="0.8220061603958406" />
-      <entry key="M30" value="0.9066455538940456" />
-      <entry key="H1" value="0.9521793706513731" />
-      <entry key="H2" value="0.9757967875799616" />
-      <entry key="H4" value="0.9878242695844043" />
-      <entry key="D1" value="0.9979603392994966" />
-      <entry key="W1" value="0.9997083648707658" />
+      <entry key="MS500" value="4.379768778574086E-155" />
+      <entry key="S2" value="2.572543907036022E-39" />
+      <entry key="S5" value="3.665600392407774E-16" />
+      <entry key="S10" value="1.9145757734829332E-8" />
+      <entry key="S30" value="0.0026752077858720105" />
+      <entry key="S60" value="0.051722410866780054" />
+      <entry key="M2" value="0.2274256161182817" />
+      <entry key="M5" value="0.5530135237753098" />
+      <entry key="M10" value="0.7436487906097271" />
+      <entry key="M15" value="0.8208149362958681" />
+      <entry key="M30" value="0.9059883753646448" />
+      <entry key="H1" value="0.9518342163237482" />
+      <entry key="H2" value="0.9756199138618209" />
+      <entry key="H4" value="0.9877347386124582" />
+      <entry key="D1" value="0.9979452637885539" />
+      <entry key="W1" value="0.9997062074400578" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="2.4622652716543274" />
-      <entry key="MS500" value="4.096422442702351" />
-      <entry key="S2" value="4.740551129366995" />
-      <entry key="S5" value="4.893157891779127" />
-      <entry key="S10" value="4.946052963425067" />
-      <entry key="S30" value="5.003810647891198" />
-      <entry key="S60" value="5.435269435871736" />
-      <entry key="M2" value="7.114964993901128" />
-      <entry key="M5" value="14.66633660250496" />
-      <entry key="M10" value="29.534297499003323" />
-      <entry key="M15" value="40.790891795971575" />
-      <entry key="M30" value="58.96610852640924" />
-      <entry key="H1" value="72.06768297566246" />
-      <entry key="H2" value="79.98593233743064" />
-      <entry key="H4" value="84.34619090368855" />
-      <entry key="D1" value="88.20308706809364" />
-      <entry key="W1" value="88.88562212342744" />
+      <entry key="MS100" value="2.0400748214062387" />
+      <entry key="MS500" value="5.987239585542396" />
+      <entry key="S2" value="12.540723088065166" />
+      <entry key="S5" value="15.456391094074265" />
+      <entry key="S10" value="16.657949107523233" />
+      <entry key="S30" value="17.556915463665156" />
+      <entry key="S60" value="18.2005795584809" />
+      <entry key="M2" value="19.978930126028345" />
+      <entry key="M5" value="27.578991564606724" />
+      <entry key="M10" value="42.4582747217874" />
+      <entry key="M15" value="53.723879947546315" />
+      <entry key="M30" value="71.91941674865912" />
+      <entry key="H1" value="85.03958381360687" />
+      <entry key="H2" value="92.97044624778329" />
+      <entry key="H4" value="97.33805232632372" />
+      <entry key="D1" value="101.20167232493736" />
+      <entry key="W1" value="101.88541854303031" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -118,6 +123,7 @@
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "main",
     "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "/Users/mdoraiswamy/work/notesdiary/app",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -127,7 +133,7 @@
     "project.structure.proportion": "0.15",
     "project.structure.side.proportion": "0.0",
     "settings.editor.selected.configurable": "vcs.Git",
-    "ts.external.directory.path": "/Users/mdoraiswamy/work/yanotes/node_modules/typescript/lib",
+    "ts.external.directory.path": "/Users/mdoraiswamy/work/notesdiary/app/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -141,6 +147,7 @@
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="37b05a8f-5c27-4906-a1e8-02c8b0b5e226" name="Changes" comment="" />
+      <changelist id="cb167cb6-944b-477c-bf6f-f5d7331a07e0" name="do-not-checkin" comment="" />
       <created>1785301407163</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
@@ -164,7 +171,15 @@
       <option name="project" value="LOCAL" />
       <updated>1785307681594</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Migrate to @open-webapp/drive-sync, restore per-project subfolders (Phase 5)&#10;Update user&#10;&#10;Replaces the forked src/lib/driveApi.ts (266 lines) and src/lib/&#10;googleAuth.ts (178 lines) with the published @open-webapp/drive-sync@^0.1.0&#10;library. src/lib/drive.ts holds the app-wide singleton (folderPath&#10;['Notes Diary'], pinned by a test against the library's own driveFake) plus&#10;ensureJsonExtension (no library equivalent).&#10;&#10;The library's frozen createDriveSync() factory takes one fixed folderPath&#10;per instance with no per-project argument, which would have flattened&#10;every project's backups into a single shared top-level folder — a real&#10;regression from the pre-migration behavior of nesting each project under&#10;its own named subfolder (except the legacy single-project app, which used&#10;the top-level folder directly). Restored via ensureProjectFolderId(): a&#10;second, short-lived createDriveSync() instance per resolution call with a&#10;project-scoped folderPath. This is safe because storage.ts's IndexedDB&#10;naming only keys off (appId, projectId), never folderPath, so multiple&#10;factory instances for the same project share one underlying token/&#10;connection store; only the app-wide `drive` singleton is ever .activate()'d.&#10;&#10;Also: re-consent banner for accounts with a drive.file-only grant (detected&#10;locally via getConnection().needsReauth, no network call), drive.dropProject&#10;wired into deleteProject, and the legacy oauth-token IndexedDB key removed&#10;from existing meta stores on boot (notes-diary-{id} DB names unchanged).&#10;&#10;Co-Authored-By: Claude Sonnet 5 &lt;noreply@anthropic.com&gt;">
+      <option name="closed" value="true" />
+      <created>1786169318074</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1786169318074</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -184,7 +199,8 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="git commit --amend --author=&quot;Your Name &lt;your_email@example.com&gt;&quot; --no-edit&#10;git push --force-with-lease" />
     <MESSAGE value="initial commit" />
-    <option name="LAST_COMMIT_MESSAGE" value="initial commit" />
+    <MESSAGE value="Migrate to @open-webapp/drive-sync, restore per-project subfolders (Phase 5)&#10;Update user&#10;&#10;Replaces the forked src/lib/driveApi.ts (266 lines) and src/lib/&#10;googleAuth.ts (178 lines) with the published @open-webapp/drive-sync@^0.1.0&#10;library. src/lib/drive.ts holds the app-wide singleton (folderPath&#10;['Notes Diary'], pinned by a test against the library's own driveFake) plus&#10;ensureJsonExtension (no library equivalent).&#10;&#10;The library's frozen createDriveSync() factory takes one fixed folderPath&#10;per instance with no per-project argument, which would have flattened&#10;every project's backups into a single shared top-level folder — a real&#10;regression from the pre-migration behavior of nesting each project under&#10;its own named subfolder (except the legacy single-project app, which used&#10;the top-level folder directly). Restored via ensureProjectFolderId(): a&#10;second, short-lived createDriveSync() instance per resolution call with a&#10;project-scoped folderPath. This is safe because storage.ts's IndexedDB&#10;naming only keys off (appId, projectId), never folderPath, so multiple&#10;factory instances for the same project share one underlying token/&#10;connection store; only the app-wide `drive` singleton is ever .activate()'d.&#10;&#10;Also: re-consent banner for accounts with a drive.file-only grant (detected&#10;locally via getConnection().needsReauth, no network call), drive.dropProject&#10;wired into deleteProject, and the legacy oauth-token IndexedDB key removed&#10;from existing meta stores on boot (notes-diary-{id} DB names unchanged).&#10;&#10;Co-Authored-By: Claude Sonnet 5 &lt;noreply@anthropic.com&gt;" />
+    <option name="LAST_COMMIT_MESSAGE" value="Migrate to @open-webapp/drive-sync, restore per-project subfolders (Phase 5)&#10;Update user&#10;&#10;Replaces the forked src/lib/driveApi.ts (266 lines) and src/lib/&#10;googleAuth.ts (178 lines) with the published @open-webapp/drive-sync@^0.1.0&#10;library. src/lib/drive.ts holds the app-wide singleton (folderPath&#10;['Notes Diary'], pinned by a test against the library's own driveFake) plus&#10;ensureJsonExtension (no library equivalent).&#10;&#10;The library's frozen createDriveSync() factory takes one fixed folderPath&#10;per instance with no per-project argument, which would have flattened&#10;every project's backups into a single shared top-level folder — a real&#10;regression from the pre-migration behavior of nesting each project under&#10;its own named subfolder (except the legacy single-project app, which used&#10;the top-level folder directly). Restored via ensureProjectFolderId(): a&#10;second, short-lived createDriveSync() instance per resolution call with a&#10;project-scoped folderPath. This is safe because storage.ts's IndexedDB&#10;naming only keys off (appId, projectId), never folderPath, so multiple&#10;factory instances for the same project share one underlying token/&#10;connection store; only the app-wide `drive` singleton is ever .activate()'d.&#10;&#10;Also: re-consent banner for accounts with a drive.file-only grant (detected&#10;locally via getConnection().needsReauth, no network call), drive.dropProject&#10;wired into deleteProject, and the legacy oauth-token IndexedDB key removed&#10;from existing meta stores on boot (notes-diary-{id} DB names unchanged).&#10;&#10;Co-Authored-By: Claude Sonnet 5 &lt;noreply@anthropic.com&gt;" />
   </component>
   <component name="XSLT-Support.FileAssociations.UIState">
     <expand />
