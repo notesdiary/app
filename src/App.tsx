@@ -548,8 +548,11 @@ function App() {
       const errorMsg = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
       console.error(`Failed to sync filter rule ${id}: ${errorMsg}`, error);
 
-      // If token refresh failed, mark as needing re-auth so UI can prompt user
-      if (error instanceof Error && (error.name === 'NeedsReauthError' || error.message.includes('re-authentication'))) {
+      // If token refresh failed, or the connection is gone entirely (e.g.
+      // revoked externally / storage cleared while driveConnected meta still
+      // says true), mark as needing re-auth so UI can prompt the user instead
+      // of failing silently on every future auto-sync.
+      if (error instanceof Error && (error.name === 'NeedsReauthError' || error.message.includes('re-authentication') || error.message.includes('No active connection'))) {
         console.warn(`[Sync] Token issue detected for rule ${id}, marking as needing re-auth`);
         setNeedsReauth(true);
       }
