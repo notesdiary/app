@@ -256,6 +256,41 @@ function App() {
     await setFilterSyncState(nextSyncState);
   };
 
+  // Download helpers: format and filename
+  const getDownloadFilename = (fileName: string, format: 'json' | 'markdown'): string => {
+    const trimmed = fileName.trim();
+    // Strip any existing extension
+    const withoutExt = trimmed.replace(/\.(json|md)$/i, '');
+    const ext = format === 'json' ? '.json' : '.md';
+    return withoutExt + ext;
+  };
+
+  const formatEntriesAsMarkdown = (matches: Entry[]): string => {
+    // Group matches by entry.date
+    const grouped = new Map<string, Entry[]>();
+    for (const e of matches) {
+      if (!grouped.has(e.date)) grouped.set(e.date, []);
+      grouped.get(e.date)!.push(e);
+    }
+
+    // Sort group keys descending (string sort works for YYYY-MM-DD)
+    const dates = Array.from(grouped.keys()).sort().reverse();
+
+    // Build markdown
+    const lines: string[] = [];
+    for (const date of dates) {
+      lines.push(`## ${date}`);
+      // Sort entries by time descending within group
+      const entries = grouped.get(date)!.sort((a, b) => b.time.localeCompare(a.time));
+      for (const e of entries) {
+        lines.push(`**${e.time}** — ${e.text}`);
+      }
+      lines.push(''); // blank line between groups
+    }
+
+    return lines.join('\n');
+  };
+
   // Filter matching (pure, local to App.tsx)
   const getFilterMatches = (rule: FilterRule, allEntries: Entry[]): Entry[] => {
     // Filter allEntries to !e.archived first
@@ -580,6 +615,31 @@ function App() {
     await syncAllFilters();
   };
 
+  const handleDownloadFilterRule = (ruleId: string, format: 'json' | 'markdown') => {
+    const rule = filterRules.find(r => r.id === ruleId);
+    if (!rule) {
+      console.error(`Filter rule ${ruleId} not found`);
+      return;
+    }
+
+    const matches = getFilterMatches(rule, entries);
+    const content = format === 'json'
+      ? JSON.stringify(matches, null, 2)
+      : formatEntriesAsMarkdown(matches);
+
+    const filename = getDownloadFilename(rule.fileName, format);
+
+    const blob = new Blob([content], {
+      type: format === 'json' ? 'application/json' : 'text/markdown'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const loadSharePermissions = async (fileId: string): Promise<DrivePermission[]> => {
     if (!activeProject) return [];
     return drive.project(activeProject.id).permissions.list(fileId);
@@ -875,6 +935,7 @@ function App() {
                   onUpdateFilterRule={updateFilterRule}
                   onRemoveFilterRule={removeFilterRule}
                   onSyncFilterRule={syncFilterRule}
+                  onDownloadFilterRule={handleDownloadFilterRule}
                   onLoadSharePermissions={loadSharePermissions}
                   onInvitePerson={invitePerson}
                   onChangePersonRole={changePersonRole}

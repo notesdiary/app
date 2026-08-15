@@ -14,6 +14,7 @@ describe('SettingsView', () => {
   const mockOnUpdateFilterRule = vi.fn();
   const mockOnRemoveFilterRule = vi.fn();
   const mockOnSyncFilterRule = vi.fn();
+  const mockOnDownloadFilterRule = vi.fn();
   const mockOnBack = vi.fn();
   const mockOnLoadSharePermissions = vi.fn().mockResolvedValue([]);
   const mockOnInvitePerson = vi.fn();
@@ -33,6 +34,7 @@ describe('SettingsView', () => {
     onUpdateFilterRule: mockOnUpdateFilterRule,
     onRemoveFilterRule: mockOnRemoveFilterRule,
     onSyncFilterRule: mockOnSyncFilterRule,
+    onDownloadFilterRule: mockOnDownloadFilterRule,
     onLoadSharePermissions: mockOnLoadSharePermissions,
     onInvitePerson: mockOnInvitePerson,
     onChangePersonRole: mockOnChangePersonRole,

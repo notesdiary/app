@@ -41,7 +41,7 @@ App
     │   │   ├── Composer         (new-entry textarea, only shown in mode 'all')
     │   │   └── EntryList
     │   │       └── EntryRow × N  → EntryContent (renders parsed tag/text parts)
-    │   ├── SettingsView        (view === 'settings')
+    │   ├── SettingsView        (view === 'settings'; local: shareModalOpenFileId, downloadMenuOpenRuleId)
     │   │   └── ShareModal        (Drive file sharing, opened per backup file)
     │   ├── ArchiveView         (view === 'archive', grouped by year-month)
     │   └── AboutView           (view === 'about')
@@ -90,6 +90,7 @@ Built on `@open-webapp/drive-sync` (external package: OAuth token lifecycle, sto
 
 ## Design patterns
 
-- Presentational components receive all data and callbacks as props from `App.tsx`; only `ArchiveView`, `ProjectPicker`, and `SettingsView`'s share-state manage their own local async state.
-- `SettingsView`'s share-permission handlers (`handleInvite`, `handleRoleChange`, `handleRemove`, `handleGeneralAccessChange`) use optimistic local updates to `shareState`, rolling back on error.
+- Presentational components receive all data and callbacks as props from `App.tsx`; only `ArchiveView`, `ProjectPicker`, and `SettingsView` manage their own local state.
+- `SettingsView` owns `shareModalOpenFileId` and `downloadMenuOpenRuleId` state; share-permission handlers (`handleInvite`, `handleRoleChange`, `handleRemove`, `handleGeneralAccessChange`) use optimistic local updates to `shareState`, rolling back on error.
+- `App.tsx` owns `handleDownloadFilterRule` handler and `getFilterMatches`-based export logic.
 - No CSS framework: component-scoped `.css` files imported alongside each `.tsx`, plus shared tokens in `src/styles/tokens.css` and TS color constants in `src/styles/app-colors.ts`.

@@ -29,6 +29,7 @@ interface SettingsViewProps {
   onUpdateFilterRule: (id: string, field: 'filter' | 'fileName', value: string) => Promise<void>;
   onRemoveFilterRule: (id: string, alsoDeleteFromDrive: boolean) => Promise<void>;
   onSyncFilterRule: (id: string) => Promise<void>;
+  onDownloadFilterRule: (id: string, format: 'json' | 'markdown') => void;
   onBack: () => void;
   onLoadSharePermissions: (fileId: string) => Promise<DrivePermission[]>;
   onInvitePerson: (fileId: string, email: string, role: string) => Promise<DrivePermission>;
@@ -41,6 +42,15 @@ interface SettingsViewProps {
       currentGeneralPermissionId?: string
   ) => Promise<DrivePermission | void>;
   onChangeGeneralRole: (fileId: string, permissionId: string, role: string) => Promise<DrivePermission>;
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M7 1v8M4 8l3 3 3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="2" y1="12" x2="12" y2="12" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
+  );
 }
 
 function SettingsShareIcon() {
@@ -91,6 +101,7 @@ export function SettingsView(props: SettingsViewProps) {
   const [pendingRemoveRuleId, setPendingRemoveRuleId] = useState<string | null>(null);
   const [shareModalOpenFileId, setShareModalOpenFileId] = useState<string | null>(null);
   const [shareState, setShareState] = useState<Record<string, ShareFileState>>({});
+  const [downloadMenuOpenRuleId, setDownloadMenuOpenRuleId] = useState<string | null>(null);
 
   const handleConnectClick = async () => {
     setIsConnecting(true);
@@ -604,6 +615,45 @@ export function SettingsView(props: SettingsViewProps) {
                                     </div>
                                     <div className="file-status">
                                       <span className="status-text">{statusText}</span>
+
+                                      {/* Download button + dropdown */}
+                                      <div className="download-button-wrapper">
+                                        <button
+                                          className="download-button"
+                                          onClick={() => setDownloadMenuOpenRuleId(
+                                            downloadMenuOpenRuleId === rule.id ? null : rule.id
+                                          )}
+                                          disabled={(props.filterMatchCounts[rule.id] || 0) === 0 || !rule.fileName.trim()}
+                                          aria-label="Download backup file"
+                                        >
+                                          <DownloadIcon />
+                                        </button>
+                                        {downloadMenuOpenRuleId === rule.id && (
+                                          <>
+                                            <div className="download-menu-backdrop" onClick={() => setDownloadMenuOpenRuleId(null)} />
+                                            <div className="download-menu">
+                                              <button
+                                                onClick={() => {
+                                                  props.onDownloadFilterRule(rule.id, 'json');
+                                                  setDownloadMenuOpenRuleId(null);
+                                                }}
+                                              >
+                                                Download as JSON
+                                              </button>
+                                              <button
+                                                onClick={() => {
+                                                  props.onDownloadFilterRule(rule.id, 'markdown');
+                                                  setDownloadMenuOpenRuleId(null);
+                                                }}
+                                              >
+                                                Download as Markdown
+                                              </button>
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+
+                                      {/* Share button (existing) */}
                                       <button
                                           className="share-button"
                                           onClick={() => state?.driveFileId && handleOpenShare(state.driveFileId)}
@@ -613,6 +663,8 @@ export function SettingsView(props: SettingsViewProps) {
                                       >
                                         <SettingsShareIcon />
                                       </button>
+
+                                      {/* Sync button (existing) */}
                                       <button
                                           className="sync-now-button"
                                           onClick={() => props.onSyncFilterRule(rule.id)}
