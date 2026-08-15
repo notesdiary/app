@@ -455,7 +455,10 @@ function App() {
       return;
     }
 
-    // Set status to 'syncing' (local, do NOT persist mid-flight)
+    // Set status to 'syncing' (local, do NOT persist mid-flight). Remember
+    // the pre-sync status so a failure can revert to it instead of leaving
+    // the row stuck on 'syncing' forever (which also disables the button).
+    const preSyncStatus = filterSyncState[id]?.status ?? 'pending';
     setFilterSyncStateLocal(prev => ({
       ...prev,
       [id]: { ...prev[id], status: 'syncing' },
@@ -557,7 +560,13 @@ function App() {
         setNeedsReauth(true);
       }
 
-      // Leave status as-is — user can retry
+      // Revert to the pre-sync status so the row doesn't stay stuck on
+      // 'syncing' (which also keeps the "Sync now" button disabled) — the
+      // user needs to be able to retry.
+      setFilterSyncStateLocal(prev => ({
+        ...prev,
+        [id]: { ...prev[id], status: preSyncStatus },
+      }));
     }
   };
 
