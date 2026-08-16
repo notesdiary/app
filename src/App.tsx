@@ -83,6 +83,10 @@ function App() {
   const isMobile = width < 960;
   const [leftOpen, setLeftOpen] = useState(true);
 
+  // State: Drive discovery (picker route)
+  const [driveDiscoveredFolders, setDriveDiscoveredFolders] = useState<{ name: string; modifiedTime: string }[]>([]);
+  const [driveDiscoveryLoading, setDriveDiscoveryLoading] = useState(false);
+
   // Activate drive-sync's background token-refresh listeners once, for the
   // life of the app. Disposed on unmount.
   useEffect(() => {
@@ -850,6 +854,67 @@ function App() {
 
   const showBackdrop = isMobile && leftOpen;
 
+  // Discover Drive folders when on picker route
+  useEffect(() => {
+    if (route.name !== 'picker') return;
+
+    const discoverFolders = async () => {
+      setDriveDiscoveryLoading(true);
+      try {
+        // Get local projects to compare names
+        const localProjects = await listProjects();
+
+        // Loop through projects to find the first one with a valid Drive connection
+        let foundProject: Project | undefined;
+        for (const p of localProjects) {
+          const connection = await drive.project(p.id).getConnection();
+          if (connection !== null && !connection.needsReauth) {
+            foundProject = p;
+            break;
+          }
+        }
+
+        // If no valid project or empty list, bail out
+        if (!foundProject || localProjects.length === 0) {
+          setDriveDiscoveredFolders([]);
+          return;
+        }
+
+        // Get the top-level Drive folder id (pass true for isLegacyProject to use shared folder)
+        const folderId = await ensureProjectFolderId(foundProject.id, foundProject.name, true);
+
+        // List immediate child folders
+        const folders = await drive.project(foundProject.id).files.list({
+          folderId,
+          mimeType: 'application/vnd.google-apps.folder',
+        });
+
+        // Filter out folders whose names match local project names (case-insensitive, trimmed)
+        const filtered = folders.filter(folder => {
+          const folderNameLower = folder.name.trim().toLowerCase();
+          return !localProjects.some(
+            p => p.name.trim().toLowerCase() === folderNameLower
+          );
+        });
+
+        // Map to {name, modifiedTime}
+        const discovered = filtered.map(folder => ({
+          name: folder.name,
+          modifiedTime: (folder as Record<string, any>).modifiedTime || 'Unknown',
+        }));
+
+        setDriveDiscoveredFolders(discovered);
+      } catch (error) {
+        console.error('Drive discovery error:', error);
+        setDriveDiscoveredFolders([]);
+      } finally {
+        setDriveDiscoveryLoading(false);
+      }
+    };
+
+    discoverFolders();
+  }, [route]);
+
   // Handle routing: if on project route, load the project; if on picker route, show picker
   useEffect(() => {
     if (!projectsLoaded) return;
@@ -874,6 +939,8 @@ function App() {
               onCreate={handleCreateProject}
               onDelete={handleDeleteProject}
               onOpen={navigateToProject}
+              driveDiscoveredFolders={driveDiscoveredFolders}
+              driveDiscoveryLoading={driveDiscoveryLoading}
           />
         </div>
     );

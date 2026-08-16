@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Project } from '../types';
+import { formatDate } from '../lib/dateUtils';
 import './ProjectPicker.css';
 
 interface ProjectPickerProps {
@@ -7,6 +8,8 @@ interface ProjectPickerProps {
   onCreate: (name: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onOpen: (id: string) => void;
+  driveDiscoveredFolders: { name: string; modifiedTime: string }[];
+  driveDiscoveryLoading: boolean;
 }
 
 export const ProjectPicker: React.FC<ProjectPickerProps> = ({
@@ -14,6 +17,8 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
   onCreate,
   onDelete,
   onOpen,
+  driveDiscoveredFolders,
+  driveDiscoveryLoading,
 }) => {
   const [newProjectName, setNewProjectName] = useState('');
   const [createError, setCreateError] = useState<string | undefined>(undefined);
@@ -102,6 +107,28 @@ export const ProjectPicker: React.FC<ProjectPickerProps> = ({
             ))}
           </div>
         )}
+      </div>
+
+      <div className="drive-discovery-section">
+        {driveDiscoveryLoading ? (
+          <p>Checking Google Drive...</p>
+        ) : driveDiscoveredFolders.length > 0 ? (
+          <>
+            <h2 className="drive-discovery-title">Also in Google Drive</h2>
+            <div className="drive-discovery-list">
+              {driveDiscoveredFolders.map(folder => (
+                <div key={folder.name} className="drive-discovery-item">
+                  <div className="drive-discovery-name">{folder.name}</div>
+                  {folder.modifiedTime && (
+                    <div className="drive-discovery-date">
+                      Last updated {formatDate(folder.modifiedTime).md}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
       </div>
 
       <div className="create-project-section">
