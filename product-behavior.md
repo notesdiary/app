@@ -12,6 +12,7 @@ Sibling docs: [design.md](./design.md), [schema-spec.md](./schema-spec.md)
 ## Project picker (`#/`)
 
 - Lists all projects with name + "Created <date>"; empty state: "No projects yet. Create one below to get started."
+- **Drive folder discovery**: if at least one project has an active Drive connection, discovers child folders in the top-level Drive folder that don't correspond to any local project name (case-insensitive match), displaying them in an "Also in Google Drive" section with name and last-modified date. Shows "Checking Google Drive…" while loading; displays nothing if no new folders found or no active connection exists.
 - Create: name input + button, Enter key also submits. Empty/whitespace name → inline error "Project name cannot be empty". Duplicate name (case-insensitive, trimmed) → error "A project with that name already exists". Button shows "Creating…" while in flight.
 - Delete: native `window.confirm("Are you sure you want to delete \"<name>\"? This action cannot be undone.")`. On confirm, deletes the project's entries IndexedDB, its registry record, and drive-sync's per-project auth database. No undo.
 

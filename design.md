@@ -54,6 +54,7 @@ All state lives in `App.tsx` via `useState`/`useEffect` — no reducer or extern
 - **Routing/projects**: `projects`, `activeProject`, `projectsLoaded`; driven by `useHashRoute()` + an effect that resolves `route` → `activeProject` and calls `setActiveProjectDb`.
 - **Entries**: `entries` (active project, non-archived), `archivedCount`.
 - **Drive**: `driveConnected`, `driveAccount`, `driveFolderId`, `needsReauth`, `filterRules`, `filterSyncState`.
+- **Drive folder discovery** (picker route): `driveDiscoveredFolders` ({ name, modifiedTime }[] from Drive folders not matching local projects), `driveDiscoveryLoading` (fetch in flight).
 - **UI filters**: `selectedTags`, `searchQuery` → derive `mode` (`lib/mode.ts`) → derive `filteredEntries` (`lib/entryFiltering.ts`).
 - **Editing**: `editingId`, `draftText` (entry edit-in-place); `composerText` (new entry).
 - **Responsive**: `width` (via `useWindowWidth`), `isMobile = width < 960`, `leftOpen`.
@@ -87,6 +88,7 @@ Built on `@open-webapp/drive-sync` (external package: OAuth token lifecycle, sto
 - **Archive entry**: × button → `handleEntryRemove` → `archiveEntry` (sets `archived: true`, entry stays in DB) → remove from `entries`, increment `archivedCount`.
 - **Restore/delete forever**: `ArchiveView` loads via `listAllArchivedEntries()` on mount; `restoreEntry`/`deleteEntryForever` update local `archivedEntries` state directly (no round-trip to `App.tsx`).
 - **Filter/search**: `searchQuery`/`selectedTags` → `deriveMode` → `filterEntries`/`filterParagraphsInEntry` (both pure, re-derived on every render, not memoized).
+- **Drive folder discovery** (picker route): on route change to 'picker', find first project with active Drive connection → resolve its top-level Drive folder (via `ensureProjectFolderId(..., true)` to force legacy behavior) → list immediate child folders → filter out names matching local projects (case-insensitive) → update `driveDiscoveredFolders` state for display.
 
 ## Design patterns
 
