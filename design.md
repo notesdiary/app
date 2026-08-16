@@ -87,7 +87,7 @@ Built on `@open-webapp/drive-sync` (external package: OAuth token lifecycle, sto
 - **Edit entry**: click a paragraph/section → `handleEntryClickToEdit` sets `editingId`/`draftText` → textarea `onBlur` → `handleEditSave` → `updateEntryText` (empty text deletes the entry) → update or remove from `entries` state.
 - **Archive entry**: × button → `handleEntryRemove` → `archiveEntry` (sets `archived: true`, entry stays in DB) → remove from `entries`, increment `archivedCount`.
 - **Restore/delete forever**: `ArchiveView` loads via `listAllArchivedEntries()` on mount; `restoreEntry`/`deleteEntryForever` update local `archivedEntries` state directly (no round-trip to `App.tsx`).
-- **Filter/search**: `searchQuery`/`selectedTags` → `deriveMode` → `filterEntries`/`filterParagraphsInEntry` (both pure, re-derived on every render, not memoized).
+- **Filter/search**: `searchQuery`/`selectedTags` → `deriveMode` → `filterEntries`/`filterParagraphsInEntry` (both pure, re-derived on every render, not memoized). `filterParagraphsInEntry` consults `getEntryLevelTags` to determine whether to return all sections or only per-section-matched subsets.
 - **Drive folder discovery** (picker route): on route change to 'picker', find first project with active Drive connection → resolve its top-level Drive folder (via `ensureProjectFolderId(..., true)` to force legacy behavior) → list immediate child folders → filter out names matching local projects (case-insensitive) → update `driveDiscoveredFolders` state for display.
 
 ## Design patterns
@@ -95,4 +95,5 @@ Built on `@open-webapp/drive-sync` (external package: OAuth token lifecycle, sto
 - Presentational components receive all data and callbacks as props from `App.tsx`; only `ArchiveView`, `ProjectPicker`, and `SettingsView` manage their own local state.
 - `SettingsView` owns `shareModalOpenFileId` and `downloadMenuOpenRuleId` state; share-permission handlers (`handleInvite`, `handleRoleChange`, `handleRemove`, `handleGeneralAccessChange`) use optimistic local updates to `shareState`, rolling back on error.
 - `App.tsx` owns `handleDownloadFilterRule` handler and `getFilterMatches`-based export logic.
+- Entry-level tags (tag-only sections): `isTagOnlySection`/`getEntryLevelTags` in `src/lib/tags.ts`, consumed only by `filterParagraphsInEntry` in `src/lib/entryFiltering.ts`; `filterEntries` and tag-counting in `LeftRail.tsx` remain unaffected.
 - No CSS framework: component-scoped `.css` files imported alongside each `.tsx`, plus shared tokens in `src/styles/tokens.css` and TS color constants in `src/styles/app-colors.ts`.

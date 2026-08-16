@@ -4,7 +4,7 @@
 
 import { Entry } from '../types';
 import { ViewMode } from './mode';
-import { splitParts, splitSections } from './tags';
+import { splitParts, splitSections, getEntryLevelTags } from './tags';
 
 export function filterEntries(
   entries: Entry[],
@@ -62,6 +62,11 @@ export function filterParagraphsInEntry(
   }
 
   if (mode === 'tag') {
+    const entryLevelTags = getEntryLevelTags(entry.text);
+    const matchesEntryLevel = selectedTags.some(st => entryLevelTags.includes(st));
+    if (matchesEntryLevel) {
+      return sections;
+    }
     return sections.filter(section => {
       const parts = splitParts(section);
       const tags = parts.filter(pt => pt.isTag).map(pt => pt.text);

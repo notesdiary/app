@@ -129,5 +129,136 @@ describe('entryFiltering', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toBe('Second #personal');
     });
+
+    // Test case 1: Entry with trailing tag-only section, filtering by entry-level tag -> returns all sections
+    it('returns all sections when filtering by entry-level tag in trailing section', () => {
+      const entryWithTrailingTag: Entry = {
+        id: '1',
+        date: '2024-01-15',
+        time: '10:00',
+        text: 'note text\n\n#work',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(entryWithTrailingTag, 'tag', ['#work'], '');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toBe('note text');
+      expect(result[1]).toBe('#work');
+    });
+
+    // Test case 2: Entry where tag appears in earlier section -> filtering by that tag returns only that section
+    it('returns only section-level match when tag appears in non-last section', () => {
+      const entryWithTagInMiddle: Entry = {
+        id: '2',
+        date: '2024-01-15',
+        time: '10:00',
+        text: '#work stuff here\n\nmore text\n\n#personal',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(entryWithTagInMiddle, 'tag', ['#work'], '');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe('#work stuff here');
+    });
+
+    // Test case 3: Entry with NON-trailing tag-only section -> old per-section behavior preserved
+    it('applies section-level filtering when tag-only section is not last', () => {
+      const entryWithEarlyTagSection: Entry = {
+        id: '3',
+        date: '2024-01-15',
+        time: '10:00',
+        text: '#work\n\nprose section',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(entryWithEarlyTagSection, 'tag', ['#work'], '');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe('#work');
+    });
+
+    // Test case 4: Entry with two trailing tag-only sections
+    it('handles multiple trailing tag-only sections correctly', () => {
+      const entryWithTwoTrailingTags: Entry = {
+        id: '4',
+        date: '2024-01-15',
+        time: '10:00',
+        text: 'body\n\n#early\n\n#late',
+        archived: false,
+        createdAt: 0,
+      };
+      // Filtering by #late (the true last section's tag) returns all sections
+      const resultLate = filterParagraphsInEntry(entryWithTwoTrailingTags, 'tag', ['#late'], '');
+      expect(resultLate).toHaveLength(3);
+      expect(resultLate[0]).toBe('body');
+      expect(resultLate[1]).toBe('#early');
+      expect(resultLate[2]).toBe('#late');
+
+      // Filtering by #early (earlier tag-only section, not last) returns only that section
+      const resultEarly = filterParagraphsInEntry(entryWithTwoTrailingTags, 'tag', ['#early'], '');
+      expect(resultEarly).toHaveLength(1);
+      expect(resultEarly[0]).toBe('#early');
+    });
+
+    // Test case 5: filterEntries regression - entry with entry-level tag still appears in tag-mode entry list
+    it('filterEntries includes entry with only entry-level tag when filtering by that tag', () => {
+      const entryWithEntryLevelTag: Entry = {
+        id: '5',
+        date: '2024-01-15',
+        time: '10:00',
+        text: 'body text\n\n#project',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterEntries([entryWithEntryLevelTag], 'tag', ['#project'], '');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('5');
+    });
+
+    // Test case 6: __untagged__ regression - entry-level tags must not swallow the untagged branch
+    it('__untagged__ filter still works with entry-level tags present', () => {
+      const entryWithEntryLevelTag: Entry = {
+        id: '6',
+        date: '2024-01-15',
+        time: '10:00',
+        text: 'body text\n\n#project',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(entryWithEntryLevelTag, 'tag', ['__untagged__'], '');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe('body text');
+    });
+
+    // Test case 7: Multi-select union - OR semantics preserved through entry-level check
+    it('handles multi-select union with entry-level tags', () => {
+      const entryWithEntryLevelTag: Entry = {
+        id: '7',
+        date: '2024-01-15',
+        time: '10:00',
+        text: 'body\n\n#project',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(entryWithEntryLevelTag, 'tag', ['#other', '#project'], '');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toBe('body');
+      expect(result[1]).toBe('#project');
+    });
+
+    // Test case 8: Retroactive-behavior test - old entries behave as entry-level after the change
+    it('retroactively applies entry-level behavior to pre-existing entries', () => {
+      const oldStyleEntry: Entry = {
+        id: '8',
+        date: '2024-01-15',
+        time: '10:00',
+        text: 'meeting notes here\n\n#meeting',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(oldStyleEntry, 'tag', ['#meeting'], '');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toBe('meeting notes here');
+      expect(result[1]).toBe('#meeting');
+    });
   });
 });

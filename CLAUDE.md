@@ -44,6 +44,7 @@ Local-first, multi-project React 18 + TypeScript + Vite diary app ("Notes Diary"
 
 - Tags are derived at render time from entry text, never persisted (`src/lib/tags.ts`, pattern `#[a-zA-Z][\w-]*`), plus a synthetic `__untagged__` pseudo-tag.
 - `src/lib/mode.ts` derives the current view mode (day/tag/search) from search query + selected tags; `src/lib/entryFiltering.ts` applies that mode to the entry list.
+- A trailing tag-only section makes its tags entry-level for the whole entry, consumed only by `filterParagraphsInEntry` (`src/lib/entryFiltering.ts`) to return all sections instead of the matched subset; derived at render time, never persisted.
 
 ### Google Drive sync
 

@@ -281,4 +281,47 @@ code block
     expect(paragraphs[0].textContent).toContain('line one');
     expect(paragraphs[1].textContent).toContain('line two');
   });
+
+  // Test 24: Regression test - trailing tag-only section renders as exactly two tag buttons with no stray text
+  it('should render trailing tag-only section as exactly two tag-link buttons with no other visible text', () => {
+    const { container } = render(
+      <EntryContent
+        text={'Went for a walk\n\n#health #outdoors'}
+        interactive={true}
+      />
+    );
+
+    const paragraphs = container.querySelectorAll('.entry-paragraph');
+    expect(paragraphs).toHaveLength(2);
+
+    // Check the second paragraph (trailing tag section)
+    const tagSection = paragraphs[1];
+    const tagLinks = tagSection.querySelectorAll('.tag-link');
+
+    // Assert exactly two tag buttons
+    expect(tagLinks).toHaveLength(2);
+
+    // Assert the tag button text content
+    expect(tagLinks[0].textContent).toBe('#health');
+    expect(tagLinks[1].textContent).toBe('#outdoors');
+
+    // Assert no stray text in the section (only tags and whitespace)
+    // Get all text nodes and filter out whitespace
+    const walker = document.createTreeWalker(
+      tagSection,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+    let textNode;
+    const textContent: string[] = [];
+    while ((textNode = walker.nextNode())) {
+      const text = textNode.textContent?.trim();
+      if (text && text.length > 0) {
+        textContent.push(text);
+      }
+    }
+
+    // Should only contain the tag text content
+    expect(textContent).toEqual(['#health', '#outdoors']);
+  });
 });

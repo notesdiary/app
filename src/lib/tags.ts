@@ -86,3 +86,34 @@ export function extractTags(text: string): string[] {
   const parts = splitParts(text);
   return parts.filter(p => p.isTag).map(p => p.text);
 }
+
+/**
+ * Check if a section contains only tags and whitespace (no other text content).
+ */
+export function isTagOnlySection(section: string): boolean {
+  const parts = splitParts(section);
+  return parts.every(part => {
+    if (part.isTag) {
+      return true;
+    }
+    // Non-tag part is tag-only if it's whitespace only
+    return part.text.trim() === '';
+  });
+}
+
+/**
+ * Extract tags from the last section of text, if that section is tag-only.
+ * Returns empty array if there are no sections, if the last section has non-tag content,
+ * or if the text contains no tags in the last section.
+ */
+export function getEntryLevelTags(text: string): string[] {
+  const sections = splitSections(text);
+  if (sections.length === 0) {
+    return [];
+  }
+  const last = sections[sections.length - 1];
+  if (!isTagOnlySection(last)) {
+    return [];
+  }
+  return extractTags(last);
+}

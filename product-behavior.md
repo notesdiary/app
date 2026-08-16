@@ -23,8 +23,9 @@ Sibling docs: [design.md](./design.md), [schema-spec.md](./schema-spec.md)
 - **Editing**: click any section of an entry (not while already editing) to turn the whole entry into an editable textarea, autofocused. Blur saves. Saving with empty/whitespace text **deletes the entry entirely** (not just clears it).
 - **Removing an entry**: hover reveals a "×" button per entry ("Archive entry" tooltip) — this archives (soft-deletes), never hard-deletes directly from the diary view.
 - **Tags**: `#word` (letter then word chars/hyphens) anywhere in text is a live tag, rendered distinctly from plain text and clickable to filter by it. Sections with zero tags count as "Untagged".
+- **Entry-level tags**: if an entry's last section contains only `#tag`s and whitespace, those tags are "entry-level" tags for the whole entry (computed at render time, not persisted). Rendering and filtering treat entry-level tags as applying to the entire entry, not just the final section.
 - **Search**: typed into the header search box; case-insensitive substring match against full entry text (not per-section) determines which *entries* show, but within a matching entry only the sections that also individually match the query are displayed. Search takes precedence over tag filters (mode `'search'` wins if the query is non-empty, regardless of selected tags).
-- **Tag filter**: clicking a tag in the left rail toggles it in/out of `selectedTags` (multi-select, OR semantics — an entry/section matches if it has *any* selected tag, and `__untagged__` matches sections with zero tags).
+- **Tag filter**: clicking a tag in the left rail toggles it in/out of `selectedTags` (multi-select, OR semantics — an entry/section matches if it has *any* selected tag, and `__untagged__` matches sections with zero tags). Exception: when a selected tag is one of an entry's entry-level tags, *all* sections of that entry display (not just matching ones); otherwise only matching sections appear.
 
 ## Left rail (tag browser)
 

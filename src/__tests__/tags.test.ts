@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitParts, splitSections, extractTags } from '../lib/tags';
+import { splitParts, splitSections, extractTags, isTagOnlySection, getEntryLevelTags } from '../lib/tags';
 
 describe('tags', () => {
   describe('splitParts', () => {
@@ -111,6 +111,75 @@ describe('tags', () => {
     it('handles multiple occurrences of same tag', () => {
       const result = extractTags('#tag #tag');
       expect(result).toEqual(['#tag', '#tag']);
+    });
+  });
+
+  describe('isTagOnlySection', () => {
+    it('returns true for tags only', () => {
+      const result = isTagOnlySection('#work #urgent');
+      expect(result).toBe(true);
+    });
+
+    it('returns false for tags mixed with prose', () => {
+      const result = isTagOnlySection('#work urgent stuff');
+      expect(result).toBe(false);
+    });
+
+    it('returns false for tags separated by punctuation', () => {
+      const result = isTagOnlySection('#work, #urgent');
+      expect(result).toBe(false);
+    });
+
+    it('returns true for empty string', () => {
+      const result = isTagOnlySection('');
+      expect(result).toBe(true);
+    });
+
+    it('returns true for whitespace only', () => {
+      const result = isTagOnlySection('   ');
+      expect(result).toBe(true);
+    });
+
+    it('returns true for tags separated by newlines', () => {
+      const result = isTagOnlySection('#work\n#urgent');
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('getEntryLevelTags', () => {
+    it('returns tags from trailing tag-only section', () => {
+      const result = getEntryLevelTags('line one\n\n#work #urgent');
+      expect(result).toEqual(['#work', '#urgent']);
+    });
+
+    it('returns empty array when tag-only section is not last', () => {
+      const result = getEntryLevelTags('#work #urgent\n\nline one');
+      expect(result).toEqual([]);
+    });
+
+    it('returns tags from single-section entry', () => {
+      const result = getEntryLevelTags('#work #urgent');
+      expect(result).toEqual(['#work', '#urgent']);
+    });
+
+    it('returns empty array for entry with no tags', () => {
+      const result = getEntryLevelTags('just prose, no tags');
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array for empty input', () => {
+      const result = getEntryLevelTags('');
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when last section has mixed tag and text', () => {
+      const result = getEntryLevelTags('line\n\n#work and more text');
+      expect(result).toEqual([]);
+    });
+
+    it('handles multiple tags with various spacing', () => {
+      const result = getEntryLevelTags('content\n\n#a #b  #c   #d');
+      expect(result).toEqual(['#a', '#b', '#c', '#d']);
     });
   });
 });
