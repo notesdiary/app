@@ -11,11 +11,12 @@ describe('EntryRow', () => {
     date: '2026-01-20',
     time: '14:30',
     text: 'Meeting scheduled @2026-01-05',
+    createdAt: 1673046600000,
   };
 
   const defaultProps = {
     entry: mockEntry,
-    mode: 'day' as const,
+    mode: 'all' as const,
     selectedTags: [] as string[],
     selectedDate: null as string | null,
     searchQuery: '',
