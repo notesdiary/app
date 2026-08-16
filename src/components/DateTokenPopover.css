@@ -1,0 +1,16 @@
+.date-token-popover {
+  z-index: 1000;
+}
+
+.date-token-popover__input {
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0.5rem;
+  border: 1px solid currentColor;
+  border-radius: 0.25rem;
+}
+
+.date-token-popover__input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}

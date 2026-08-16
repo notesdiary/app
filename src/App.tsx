@@ -66,6 +66,7 @@ function App() {
 
   // State: UI filters and mode
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   // State: editing
@@ -140,11 +141,13 @@ function App() {
       setEntries(allEntries);
       setArchivedCount(await countArchivedEntries());
 
-      // Load Drive metadata
+      // Load Drive metadata. Every field is set unconditionally (even to
+      // undefined) so switching to a project whose meta lacks a field resets
+      // it, instead of leaking the previously active project's value.
       const driveMeta = await getDriveMeta();
       setDriveConnected(driveMeta.driveConnected);
-      if (driveMeta.driveAccount) setDriveAccount(driveMeta.driveAccount);
-      if (driveMeta.driveFolderId) setDriveFolderId(driveMeta.driveFolderId);
+      setDriveAccount(driveMeta.driveAccount);
+      setDriveFolderId(driveMeta.driveFolderId);
 
       // Proactively detect whether the connected account's granted scopes
       // are missing a now-required scope (e.g. userinfo.email, added after
@@ -208,10 +211,10 @@ function App() {
   }, [driveConnected, activeProject?.id]);
 
   // Derive the current mode
-  const mode = deriveMode(searchQuery, selectedTags);
+  const mode = deriveMode(searchQuery, selectedTags, selectedDate);
 
   // Filter entries based on current mode and filters
-  const filteredEntries = filterEntries(entries, mode, selectedTags, searchQuery);
+  const filteredEntries = filterEntries(entries, mode, selectedTags, searchQuery, selectedDate);
 
   // Rule CRUD (local + persisted, no Drive calls)
   const addFilterRule = async () => {
@@ -380,6 +383,11 @@ function App() {
         return [...prev, tag];
       }
     });
+    closeDrawersOnMobile();
+  };
+
+  const handleDateClick = (date: string) => {
+    setSelectedDate(prev => (prev === date ? null : date));
     closeDrawersOnMobile();
   };
 
@@ -952,6 +960,8 @@ function App() {
             entries={entries}
             selectedTags={selectedTags}
             onTagClick={handleTagClick}
+            selectedDate={selectedDate}
+            onDateClick={handleDateClick}
             archivedCount={archivedCount}
             onSettingsClick={handleSettingsClick}
             onArchiveClick={handleArchiveClick}
@@ -967,6 +977,7 @@ function App() {
                   entries={filteredEntries}
                   searchQuery={searchQuery}
                   selectedTags={selectedTags}
+                  selectedDate={selectedDate}
                   composerText={composerText}
                   editingId={editingId}
                   editText={draftText}
@@ -980,6 +991,7 @@ function App() {
                   onEditTextChange={setDraftText}
                   onEditSave={handleEditSave}
                   onTagClick={handleTagClick}
+                  onDateClick={handleDateClick}
                   onEntryRemove={handleEntryRemove}
                   onEntryClickToEdit={handleEntryClickToEdit}
                   onHamburgerClick={handleHamburgerClick}

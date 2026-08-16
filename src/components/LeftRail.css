@@ -48,6 +48,14 @@
   overflow: hidden;
 }
 
+.browse-by-date-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid #e0e0e0;
+}
+
 .section-header {
   padding: 16px;
   font-size: 12px;
@@ -123,6 +131,63 @@
 }
 
 .tag-item.selected .tag-count {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.date-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.no-dates {
+  padding: 16px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+.date-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 200ms;
+  color: #00a9ce;
+  text-align: left;
+}
+
+.date-item:hover {
+  border-color: #00a9ce;
+}
+
+.date-item.selected {
+  background: #081a59;
+  color: #ffffff;
+  border-color: #081a59;
+}
+
+.date-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.date-count {
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 2px 6px;
+  border-radius: 3px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.date-item.selected .date-count {
   background: rgba(255, 255, 255, 0.3);
 }
 
@@ -218,11 +283,24 @@
     border-bottom-color: #333333;
   }
 
+  .browse-by-date-section {
+    border-top-color: #333333;
+  }
+
   .no-tags {
     color: #666666;
   }
 
+  .no-dates {
+    color: #666666;
+  }
+
   .tag-item {
+    border-color: #444444;
+    color: #22d0ef;
+  }
+
+  .date-item {
     border-color: #444444;
     color: #22d0ef;
   }
@@ -248,6 +326,20 @@
   }
 
   .tag-count {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  .date-item:hover {
+    border-color: #22d0ef;
+  }
+
+  .date-item.selected {
+    background: #00a9ce;
+    color: #1a1a1a;
+    border-color: #00a9ce;
+  }
+
+  .date-count {
     background: rgba(255, 255, 255, 0.15);
   }
 

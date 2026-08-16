@@ -261,4 +261,206 @@ describe('entryFiltering', () => {
       expect(result[1]).toBe('#meeting');
     });
   });
+
+  describe('filterEntries with selectedDate (tag mode + date)', () => {
+    it('T6: Bug-fix test - date-only filter with empty selectedTags returns entry', () => {
+      // This test will FAIL without the selectedTags.length === 0 guard
+      const entryWithDate: Entry = {
+        id: '1',
+        date: '2026-01-05',
+        time: '10:00',
+        text: 'Some note @2026-01-05',
+        archived: false,
+        createdAt: 0,
+      };
+      // selectedTags is empty [], selectedDate is "2026-01-05"
+      // Without the guard, selectedTags.some() returns false even though we want date-only filtering
+      const result = filterEntries([entryWithDate], 'tag', [], '', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('1');
+    });
+
+    it('filters by date when no date-containing sections match', () => {
+      const entries: Entry[] = [
+        {
+          id: '1',
+          date: '2026-01-05',
+          time: '10:00',
+          text: 'Section A @2026-01-05\n\nSection B no date',
+          archived: false,
+          createdAt: 0,
+        },
+        {
+          id: '2',
+          date: '2026-01-06',
+          time: '10:00',
+          text: 'Other note @2026-01-06',
+          archived: false,
+          createdAt: 0,
+        },
+      ];
+      // Filter by date "2026-01-05" with no tag filter
+      const result = filterEntries(entries, 'tag', [], '', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('1');
+    });
+
+    it('AND logic: tag AND date both required', () => {
+      const entries: Entry[] = [
+        {
+          id: '1',
+          date: '2026-01-05',
+          time: '10:00',
+          text: '#work @2026-01-05',
+          archived: false,
+          createdAt: 0,
+        },
+        {
+          id: '2',
+          date: '2026-01-05',
+          time: '10:00',
+          text: '#work no date',
+          archived: false,
+          createdAt: 0,
+        },
+        {
+          id: '3',
+          date: '2026-01-05',
+          time: '10:00',
+          text: 'no tag @2026-01-05',
+          archived: false,
+          createdAt: 0,
+        },
+      ];
+      // Filter by tag "#work" AND date "2026-01-05"
+      // Should return only entry 1 (has both tag and date in same section)
+      const result = filterEntries(entries, 'tag', ['#work'], '', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('1');
+    });
+
+    it('no selectedDate = regression - tag-only filtering unchanged', () => {
+      const entries: Entry[] = [
+        {
+          id: '1',
+          date: '2026-01-05',
+          time: '10:00',
+          text: '#work @2026-01-05',
+          archived: false,
+          createdAt: 0,
+        },
+        {
+          id: '2',
+          date: '2026-01-05',
+          time: '10:00',
+          text: '#work no date',
+          archived: false,
+          createdAt: 0,
+        },
+      ];
+      // Filter by tag only (no selectedDate or selectedDate=null)
+      // Both should match (old behavior)
+      const result = filterEntries(entries, 'tag', ['#work'], '');
+      expect(result).toHaveLength(2);
+    });
+
+    it('search mode ignores selectedDate - precedence unchanged', () => {
+      const entries: Entry[] = [
+        {
+          id: '1',
+          date: '2026-01-05',
+          time: '10:00',
+          text: 'hello @2026-01-05',
+          archived: false,
+          createdAt: 0,
+        },
+        {
+          id: '2',
+          date: '2026-01-06',
+          time: '10:00',
+          text: 'hello @2026-01-06',
+          archived: false,
+          createdAt: 0,
+        },
+      ];
+      // Even with selectedDate, search mode should return both (date filter ignored in search mode)
+      const result = filterEntries(entries, 'search', [], 'hello', '2026-01-05');
+      expect(result).toHaveLength(2);
+    });
+  });
+
+  describe('filterParagraphsInEntry with selectedDate (tag mode + date)', () => {
+    it('filters sections by date when selectedDate provided', () => {
+      const entry: Entry = {
+        id: '1',
+        date: '2026-01-05',
+        time: '10:00',
+        text: 'Section A @2026-01-05\n\nSection B @2026-01-06',
+        archived: false,
+        createdAt: 0,
+      };
+      // Filter by date "2026-01-05" with no tag filter
+      const result = filterParagraphsInEntry(entry, 'tag', [], '', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe('Section A @2026-01-05');
+    });
+
+    it('AND logic in filterParagraphsInEntry: tag AND date both required', () => {
+      const entry: Entry = {
+        id: '1',
+        date: '2026-01-05',
+        time: '10:00',
+        text: '#work @2026-01-05\n\n#work no date\n\nno tag @2026-01-05',
+        archived: false,
+        createdAt: 0,
+      };
+      // Filter by tag "#work" AND date "2026-01-05"
+      const result = filterParagraphsInEntry(entry, 'tag', ['#work'], '', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe('#work @2026-01-05');
+    });
+
+    it('date-only filter in filterParagraphsInEntry', () => {
+      const entry: Entry = {
+        id: '1',
+        date: '2026-01-05',
+        time: '10:00',
+        text: 'Undated section\n\n@2026-01-05 only date\n\n#tag no date',
+        archived: false,
+        createdAt: 0,
+      };
+      const result = filterParagraphsInEntry(entry, 'tag', [], '', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe('@2026-01-05 only date');
+    });
+
+    it('no selectedDate = regression - tag-only filtering in filterParagraphsInEntry', () => {
+      const entry: Entry = {
+        id: '1',
+        date: '2026-01-05',
+        time: '10:00',
+        text: '#work @2026-01-05\n\n#work no date\n\nno tag @2026-01-05',
+        archived: false,
+        createdAt: 0,
+      };
+      // Filter by tag only (no selectedDate)
+      // Both #work sections should match
+      const result = filterParagraphsInEntry(entry, 'tag', ['#work'], '');
+      expect(result).toHaveLength(2);
+    });
+
+    it('search mode ignores selectedDate in filterParagraphsInEntry', () => {
+      const entry: Entry = {
+        id: '1',
+        date: '2026-01-05',
+        time: '10:00',
+        text: 'hello @2026-01-05\n\nhello @2026-01-06',
+        archived: false,
+        createdAt: 0,
+      };
+      // Even with selectedDate, search mode should return both
+      const result = filterParagraphsInEntry(entry, 'search', [], 'hello', '2026-01-05');
+      expect(result).toHaveLength(2);
+    });
+  });
 });

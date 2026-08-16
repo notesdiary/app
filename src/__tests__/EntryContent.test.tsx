@@ -324,4 +324,172 @@ code block
     // Should only contain the tag text content
     expect(textContent).toEqual(['#health', '#outdoors']);
   });
+
+  // Test 25: Interactive date pill renders as button with formatted date, calls onDateClick
+  it('should render date pill as button with formatted date in interactive mode and call onDateClick', async () => {
+    const onDateClick = vi.fn();
+    const onSectionClick = vi.fn();
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <EntryContent
+        text="Meeting scheduled @2026-01-05"
+        interactive={true}
+        onDateClick={onDateClick}
+        onSectionClick={onSectionClick}
+      />
+    );
+
+    const datePill = container.querySelector('.date-pill');
+    expect(datePill).toBeInTheDocument();
+    expect(datePill?.textContent).toBe('Jan 5, 2026');
+
+    await user.click(datePill!);
+
+    expect(onDateClick).toHaveBeenCalledWith('2026-01-05', expect.any(Object));
+    expect(onSectionClick).not.toHaveBeenCalled();
+  });
+
+  // Test 26: Non-interactive date pill renders as span
+  it('should render date pill as span with formatted date in non-interactive mode', () => {
+    const { container } = render(
+      <EntryContent
+        text="Meeting scheduled @2026-01-05"
+        interactive={false}
+      />
+    );
+
+    const datePillText = container.querySelector('.date-pill-text');
+    expect(datePillText).toBeInTheDocument();
+    expect(datePillText?.textContent).toBe('Jan 5, 2026');
+  });
+
+  // Test 27: Duplicate date tokens - only first is rendered as pill
+  it('should render duplicate date tokens with exactly one date pill', () => {
+    const { container } = render(
+      <EntryContent
+        text="First date @2026-01-05 and again @2026-01-05"
+        interactive={false}
+      />
+    );
+
+    const datePillTexts = container.querySelectorAll('.date-pill-text');
+    expect(datePillTexts).toHaveLength(1);
+    expect(datePillTexts[0].textContent).toBe('Jan 5, 2026');
+
+    // The second date token should remain as plain text
+    const text = container.querySelector('.entry-paragraph')?.textContent || '';
+    expect(text).toContain('Jan 5, 2026'); // From the pill
+    expect(text).toContain('@2026-01-05'); // The second occurrence as plain text
+  });
+
+  // Test 28: Mixed tags and dates render independently
+  it('should render mixed tags and dates independently', () => {
+    const onTagClick = vi.fn();
+    const onDateClick = vi.fn();
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <EntryContent
+        text="Event #meeting @2026-01-05"
+        interactive={true}
+        onTagClick={onTagClick}
+        onDateClick={onDateClick}
+      />
+    );
+
+    const tagLink = container.querySelector('.tag-link');
+    const datePill = container.querySelector('.date-pill');
+
+    expect(tagLink).toBeInTheDocument();
+    expect(tagLink?.textContent).toBe('#meeting');
+
+    expect(datePill).toBeInTheDocument();
+    expect(datePill?.textContent).toBe('Jan 5, 2026');
+  });
+
+  // Test 29: Markdown emphasis with dates - splits children, exactly one date pill
+  it('should handle markdown emphasis with dates, emitting exactly one date pill', async () => {
+    const { container } = render(
+      <EntryContent
+        text="@2026-01-05 a *b* @2026-02-10"
+        interactive={false}
+      />
+    );
+
+    const datePillTexts = container.querySelectorAll('.date-pill-text');
+    expect(datePillTexts).toHaveLength(1);
+    expect(datePillTexts[0].textContent).toBe('Jan 5, 2026');
+
+    // Verify the second date appears as plain text (not a pill)
+    const text = container.querySelector('.entry-paragraph')?.textContent || '';
+    expect(text).toContain('@2026-02-10');
+  });
+
+  // Test 30: List form - one section with multiple items, one date pill per section
+  it('should render list content with exactly one date pill in one section', () => {
+    const { container } = render(
+      <EntryContent
+        text="- @2026-01-05\n- @2026-02-10"
+        interactive={false}
+      />
+    );
+
+    // Should be one paragraph/section since there's no blank line between items
+    const paragraphs = container.querySelectorAll('.entry-paragraph');
+    expect(paragraphs).toHaveLength(1);
+
+    // Verify exactly one date pill in this section (due to alreadyEmitted flag)
+    const datePillTexts = container.querySelectorAll('.date-pill-text');
+    expect(datePillTexts).toHaveLength(1);
+    expect(datePillTexts[0].textContent).toBe('Jan 5, 2026');
+
+    // Second date should be plain text
+    const textContent = paragraphs[0].textContent || '';
+    expect(textContent).toContain('@2026-02-10');
+  });
+
+  // Test 31: Per-section independence with blank line separator
+  it('should render separate sections with their own date pills when separated by blank lines', () => {
+    // Three sections: one with date in middle section
+    const { container } = render(
+      <EntryContent
+        text="First section\n\nSecond @2026-01-05\n\nThird section"
+        interactive={false}
+      />
+    );
+
+    const paragraphs = container.querySelectorAll('.entry-paragraph');
+    expect(paragraphs.length).toBeGreaterThanOrEqual(1);
+
+    // Verify date pill is rendered
+    const datePillTexts = container.querySelectorAll('.date-pill-text');
+    expect(datePillTexts).toHaveLength(1);
+    expect(datePillTexts[0].textContent).toBe('Jan 5, 2026');
+
+    // Verify the overall content contains all parts
+    const fullContent = container.querySelector('.entry-paragraphs')?.textContent || '';
+    expect(fullContent).toContain('First section');
+    expect(fullContent).toContain('Jan 5, 2026');
+    expect(fullContent).toContain('Third section');
+  });
+
+  // Test 32: Regression - section splitting still works with existing tags
+  it('should still split content into separate paragraphs on blank lines with tags', () => {
+    const text = 'line one #tag1\n\nline two #tag2';
+    const { container } = render(
+      <EntryContent
+        text={text}
+        interactive={false}
+      />
+    );
+
+    const paragraphs = container.querySelectorAll('.entry-paragraph');
+    expect(paragraphs).toHaveLength(2);
+    expect(paragraphs[0].textContent).toContain('line one');
+    expect(paragraphs[1].textContent).toContain('line two');
+
+    const tagTexts = container.querySelectorAll('.tag-text');
+    expect(tagTexts).toHaveLength(2);
+  });
 });

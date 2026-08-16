@@ -25,6 +25,8 @@ describe('LeftRail', () => {
         entries={[entryA, entryB]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -60,6 +62,8 @@ describe('LeftRail', () => {
         entries={[entry]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -81,6 +85,8 @@ describe('LeftRail', () => {
         entries={[entry]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -103,6 +109,8 @@ describe('LeftRail', () => {
         entries={[entryA, entryB]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -127,6 +135,8 @@ describe('LeftRail', () => {
         entries={[]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -148,6 +158,8 @@ describe('LeftRail', () => {
         entries={[entry]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -178,6 +190,8 @@ describe('LeftRail', () => {
         entries={[entry]}
         selectedTags={[]}
         onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
         archivedCount={0}
         onSettingsClick={vi.fn()}
         onArchiveClick={vi.fn()}
@@ -200,5 +214,236 @@ describe('LeftRail', () => {
     const untaggedNameElement = screen.getByText('Untagged');
     const untaggedCountElement = untaggedNameElement.parentElement?.querySelector('.tag-count');
     expect(untaggedCountElement?.textContent).toBe('1');
+  });
+
+  // Date browsing tests
+
+  it('counts dates per section correctly', () => {
+    const entryA = createMockEntry('a', 'note @2026-01-05');
+    const entryB = createMockEntry('b', 'other @2026-01-05');
+    const entryC = createMockEntry('c', 'later @2026-02-01');
+
+    render(
+      <LeftRail
+        entries={[entryA, entryB, entryC]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    // 2026-01-05 should have count 2
+    const dateItems = screen.getAllByText(/Jan \d+, 2026|Feb \d+, 2026/);
+    const jan05Item = dateItems.find(el => el.textContent === 'Jan 5, 2026');
+    expect(jan05Item).toBeInTheDocument();
+    const jan05Count = jan05Item?.parentElement?.querySelector('.date-count');
+    expect(jan05Count?.textContent).toBe('2');
+
+    // 2026-02-01 should have count 1
+    const feb01Item = dateItems.find(el => el.textContent === 'Feb 1, 2026');
+    expect(feb01Item).toBeInTheDocument();
+    const feb01Count = feb01Item?.parentElement?.querySelector('.date-count');
+    expect(feb01Count?.textContent).toBe('1');
+  });
+
+  it('renders "Browse by date" section AFTER "Browse by tag" section', () => {
+    const entry = createMockEntry('a', '#work\n\nlater @2026-02-01');
+
+    const { container } = render(
+      <LeftRail
+        entries={[entry]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    const tagSection = container.querySelector('.browse-by-tag-section');
+    const dateSection = container.querySelector('.browse-by-date-section');
+
+    expect(tagSection).toBeInTheDocument();
+    expect(dateSection).toBeInTheDocument();
+
+    // Tag section should come before date section in DOM by comparing their position
+    const railDiv = container.querySelector('.left-rail')!;
+    const allChildren = Array.from(railDiv.children);
+    const tagSectionIndex = allChildren.indexOf(tagSection!);
+    const dateSectionIndex = allChildren.indexOf(dateSection!);
+    expect(tagSectionIndex).toBeLessThan(dateSectionIndex);
+  });
+
+  it('handles entries with no dated sections without crashing', () => {
+    const entry = createMockEntry('a', 'no dates here #tag');
+
+    render(
+      <LeftRail
+        entries={[entry]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    // Should render "No dates found" message
+    expect(screen.getByText('No dates found')).toBeInTheDocument();
+  });
+
+  it('renders date items with correct count and calls onDateClick', () => {
+    const onDateClick = vi.fn();
+    const entry = createMockEntry('a', 'note @2026-01-05\n\nmore @2026-01-05');
+
+    render(
+      <LeftRail
+        entries={[entry]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={onDateClick}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    const dateButton = screen.getByText('Jan 5, 2026').closest('button');
+    expect(dateButton).toBeInTheDocument();
+    expect(dateButton?.querySelector('.date-count')?.textContent).toBe('2');
+
+    // Click the date button
+    dateButton?.click();
+    expect(onDateClick).toHaveBeenCalledWith('2026-01-05');
+  });
+
+  it('applies selected class when selectedDate matches', () => {
+    const entry = createMockEntry('a', 'note @2026-01-05');
+
+    const { container } = render(
+      <LeftRail
+        entries={[entry]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate="2026-01-05"
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    const dateButton = screen.getByText('Jan 5, 2026').closest('button');
+    expect(dateButton).toHaveClass('selected');
+  });
+
+  it('does not apply selected class when selectedDate does not match', () => {
+    const entry = createMockEntry('a', 'note @2026-01-05');
+
+    render(
+      <LeftRail
+        entries={[entry]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate="2026-02-01"
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    const dateButton = screen.getByText('Jan 5, 2026').closest('button');
+    expect(dateButton).not.toHaveClass('selected');
+  });
+
+  it('dates sort in descending order (ISO lexicographic)', () => {
+    const entryA = createMockEntry('a', 'note @2026-01-05');
+    const entryB = createMockEntry('b', 'other @2026-02-01');
+    const entryC = createMockEntry('c', 'later @2026-03-15');
+
+    const { container } = render(
+      <LeftRail
+        entries={[entryA, entryB, entryC]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    const dateItems = container.querySelectorAll('.date-item .date-name');
+    const dates = Array.from(dateItems).map(el => el.textContent);
+
+    // Should be in descending order: Mar 15, 2026 > Feb 1, 2026 > Jan 5, 2026
+    expect(dates[0]).toBe('Mar 15, 2026');
+    expect(dates[1]).toBe('Feb 1, 2026');
+    expect(dates[2]).toBe('Jan 5, 2026');
+  });
+
+  it('tag counts are unaffected by date rendering (regression)', () => {
+    const entryA = createMockEntry('a', 'note @2026-01-05 #work');
+    const entryB = createMockEntry('b', '#work other @2026-01-05');
+
+    render(
+      <LeftRail
+        entries={[entryA, entryB]}
+        selectedTags={[]}
+        onTagClick={vi.fn()}
+        selectedDate={null}
+        onDateClick={vi.fn()}
+        archivedCount={0}
+        onSettingsClick={vi.fn()}
+        onArchiveClick={vi.fn()}
+        onAboutClick={vi.fn()}
+        onSwitchProjectClick={vi.fn()}
+        isMobile={false}
+        isOpen={true}
+      />
+    );
+
+    // #work should still have count 2 (from 2 sections)
+    const workCountElement = screen.getByText('#work').parentElement?.querySelector('.tag-count');
+    expect(workCountElement?.textContent).toBe('2');
   });
 });

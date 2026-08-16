@@ -37,5 +37,20 @@ describe('mode', () => {
       const result = deriveMode('   ', []);
       expect(result).toBe('all');
     });
+
+    it('returns all mode when selectedDate is null', () => {
+      const result = deriveMode('', [], null);
+      expect(result).toBe('all');
+    });
+
+    it('returns tag mode when selectedDate is set', () => {
+      const result = deriveMode('', [], '2026-01-05');
+      expect(result).toBe('tag');
+    });
+
+    it('search mode takes precedence over selectedDate', () => {
+      const result = deriveMode('query', [], '2026-01-05');
+      expect(result).toBe('search');
+    });
   });
 });

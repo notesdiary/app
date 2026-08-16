@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { splitParts, splitSections, extractTags, isTagOnlySection, getEntryLevelTags } from '../lib/tags';
+import {
+  splitParts,
+  splitSections,
+  extractTags,
+  isTagOnlySection,
+  getEntryLevelTags,
+  isValidCalendarDate,
+  findAcceptedDateToken,
+  parseSectionDate,
+  splitPartsWithDate,
+  AlreadyEmitted,
+} from '../lib/tags';
 
 describe('tags', () => {
   describe('splitParts', () => {
@@ -180,6 +191,313 @@ describe('tags', () => {
     it('handles multiple tags with various spacing', () => {
       const result = getEntryLevelTags('content\n\n#a #b  #c   #d');
       expect(result).toEqual(['#a', '#b', '#c', '#d']);
+    });
+  });
+
+  describe('isValidCalendarDate', () => {
+    it('returns true for valid leap year date', () => {
+      expect(isValidCalendarDate(2026, 2, 28)).toBe(true);
+    });
+
+    it('returns false for Feb 29 in non-leap year', () => {
+      expect(isValidCalendarDate(2026, 2, 29)).toBe(false);
+    });
+
+    it('returns true for Feb 29 in leap year', () => {
+      expect(isValidCalendarDate(2024, 2, 29)).toBe(true);
+    });
+
+    it('returns false for Feb 30', () => {
+      expect(isValidCalendarDate(2026, 2, 30)).toBe(false);
+    });
+
+    it('returns false for month 13', () => {
+      expect(isValidCalendarDate(2026, 13, 5)).toBe(false);
+    });
+
+    it('returns false for month 0', () => {
+      expect(isValidCalendarDate(2026, 0, 5)).toBe(false);
+    });
+
+    it('returns false for day 0', () => {
+      expect(isValidCalendarDate(2026, 1, 0)).toBe(false);
+    });
+
+    it('returns false for day 32 in 31-day month', () => {
+      expect(isValidCalendarDate(2026, 1, 32)).toBe(false);
+    });
+
+    it('returns false for day 31 in 30-day month', () => {
+      expect(isValidCalendarDate(2026, 4, 31)).toBe(false);
+    });
+
+    it('returns true for Jan 1', () => {
+      expect(isValidCalendarDate(2026, 1, 1)).toBe(true);
+    });
+
+    it('returns true for Dec 31', () => {
+      expect(isValidCalendarDate(2026, 12, 31)).toBe(true);
+    });
+  });
+
+  describe('findAcceptedDateToken', () => {
+    it('finds valid date in middle of text', () => {
+      const result = findAcceptedDateToken('meeting @2026-01-05 notes');
+      expect(result).toEqual({
+        index: 8,
+        raw: '@2026-01-05',
+        iso: '2026-01-05',
+      });
+    });
+
+    it('finds date at start of text', () => {
+      const result = findAcceptedDateToken('@2026-01-05');
+      expect(result).toEqual({
+        index: 0,
+        raw: '@2026-01-05',
+        iso: '2026-01-05',
+      });
+    });
+
+    it('returns null when no date present', () => {
+      const result = findAcceptedDateToken('no date here');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for invalid month', () => {
+      const result = findAcceptedDateToken('@2026-13-45');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for invalid day', () => {
+      const result = findAcceptedDateToken('@2026-02-30');
+      expect(result).toBeNull();
+    });
+
+    it('returns first valid date when multiple present', () => {
+      const result = findAcceptedDateToken('@2026-01-05 and @2026-02-10');
+      expect(result).toEqual({
+        index: 0,
+        raw: '@2026-01-05',
+        iso: '2026-01-05',
+      });
+    });
+
+    it('skips invalid dates and returns first valid', () => {
+      const result = findAcceptedDateToken('@2026-13-45 then @2026-01-05');
+      expect(result).toEqual({
+        index: 17,
+        raw: '@2026-01-05',
+        iso: '2026-01-05',
+      });
+    });
+
+    it('requires whitespace or start before @ (rejects foo@2026-01-05)', () => {
+      const result = findAcceptedDateToken('foo@2026-01-05');
+      expect(result).toBeNull();
+    });
+
+    it('rejects date followed by digit (@2026-01-051)', () => {
+      const result = findAcceptedDateToken('@2026-01-051');
+      expect(result).toBeNull();
+    });
+
+    it('rejects wrong format (@2026-1-5)', () => {
+      const result = findAcceptedDateToken('@2026-1-5');
+      expect(result).toBeNull();
+    });
+
+    it('accepts date at end of text', () => {
+      const result = findAcceptedDateToken('meeting on @2026-01-05');
+      expect(result).toEqual({
+        index: 11,
+        raw: '@2026-01-05',
+        iso: '2026-01-05',
+      });
+    });
+  });
+
+  describe('parseSectionDate', () => {
+    it('returns ISO date for text with valid date', () => {
+      const result = parseSectionDate('meeting @2026-01-05 notes');
+      expect(result).toBe('2026-01-05');
+    });
+
+    it('returns ISO date for bare date', () => {
+      const result = parseSectionDate('@2026-01-05');
+      expect(result).toBe('2026-01-05');
+    });
+
+    it('returns null for text without date', () => {
+      const result = parseSectionDate('no date');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for invalid calendar date', () => {
+      const result = parseSectionDate('@2026-13-45');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for Feb 30', () => {
+      const result = parseSectionDate('@2026-02-30');
+      expect(result).toBeNull();
+    });
+
+    it('returns first valid date when multiple present', () => {
+      const result = parseSectionDate('@2026-01-05 and @2026-02-10');
+      expect(result).toBe('2026-01-05');
+    });
+
+    it('skips invalid and returns first valid date', () => {
+      const result = parseSectionDate('@2026-13-45 then @2026-01-05');
+      expect(result).toBe('2026-01-05');
+    });
+
+    it('returns null for date missing boundary (foo@2026-01-05)', () => {
+      const result = parseSectionDate('foo@2026-01-05');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for date with trailing digit (@2026-01-051)', () => {
+      const result = parseSectionDate('@2026-01-051');
+      expect(result).toBeNull();
+    });
+
+    it('returns null for wrong format (@2026-1-5)', () => {
+      const result = parseSectionDate('@2026-1-5');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('splitPartsWithDate', () => {
+    it('marks matching date with isDate:true and date field', () => {
+      const result = splitPartsWithDate('note @2026-01-05 done', '2026-01-05');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ text: 'note ', isTag: false });
+      expect(result[1]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(result[2]).toEqual({ text: ' done', isTag: false });
+    });
+
+    it('treats date as plain text when acceptedIso is null', () => {
+      const result = splitPartsWithDate('@2026-01-05', null);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ text: '@2026-01-05', isTag: false });
+    });
+
+    it('ignores non-matching date tokens', () => {
+      const result = splitPartsWithDate('@2026-02-10', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ text: '@2026-02-10', isTag: false });
+    });
+
+    it('marks first matching date when multiple different dates present', () => {
+      const result = splitPartsWithDate('@2026-01-05 and @2026-02-10', '2026-01-05');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(result[1]).toEqual({ text: ' and ', isTag: false });
+      expect(result[2]).toEqual({ text: '@2026-02-10', isTag: false });
+    });
+
+    it('marks first matching date when same date appears multiple times', () => {
+      const result = splitPartsWithDate('@2026-01-05 and @2026-01-05', '2026-01-05');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(result[1]).toEqual({ text: ' and ', isTag: false });
+      expect(result[2]).toEqual({ text: '@2026-01-05', isTag: false });
+      expect(result[2].isDate).toBeUndefined();
+      expect(result[2].date).toBeUndefined();
+    });
+
+    it('shares emitted flag across multiple calls', () => {
+      const state: AlreadyEmitted = { done: false };
+      const result1 = splitPartsWithDate('@2026-01-05 text', '2026-01-05', state);
+      expect(result1[0]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(state.done).toBe(true);
+
+      // Now call again with same state
+      const result2 = splitPartsWithDate('@2026-01-05 more', '2026-01-05', state);
+      expect(result2[0]).toEqual({ text: '@2026-01-05', isTag: false });
+      expect(result2[0].isDate).toBeUndefined();
+      expect(result2[0].date).toBeUndefined();
+    });
+
+    it('maintains splitParts behavior - tags unchanged', () => {
+      const result = splitParts('hi #foo bar');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ text: 'hi ', isTag: false });
+      expect(result[1]).toEqual({ text: '#foo', isTag: true });
+      expect(result[2]).toEqual({ text: ' bar', isTag: false });
+    });
+
+    it('handles date and tags together', () => {
+      const result = splitPartsWithDate('note @2026-01-05 #work done', '2026-01-05');
+      expect(result).toHaveLength(5);
+      expect(result[0]).toEqual({ text: 'note ', isTag: false });
+      expect(result[1]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(result[2]).toEqual({ text: ' ', isTag: false });
+      expect(result[3]).toEqual({ text: '#work', isTag: true });
+      expect(result[4]).toEqual({ text: ' done', isTag: false });
+    });
+
+    it('handles tags before and after marked date', () => {
+      const result = splitPartsWithDate('#start @2026-01-05 #end', '2026-01-05');
+      expect(result).toHaveLength(5);
+      expect(result[0]).toEqual({ text: '#start', isTag: true });
+      expect(result[1]).toEqual({ text: ' ', isTag: false });
+      expect(result[2]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(result[3]).toEqual({ text: ' ', isTag: false });
+      expect(result[4]).toEqual({ text: '#end', isTag: true });
+    });
+
+    it('rejects invalid date tokens and only marks valid matching dates', () => {
+      const result = splitPartsWithDate('@2026-13-45 real @2026-01-05', '2026-01-05');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ text: '@2026-13-45 real ', isTag: false });
+      expect(result[1]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+    });
+
+    it('date at start of text', () => {
+      const result = splitPartsWithDate('@2026-01-05 start', '2026-01-05');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+      expect(result[1]).toEqual({ text: ' start', isTag: false });
+    });
+
+    it('date at end of text', () => {
+      const result = splitPartsWithDate('end @2026-01-05', '2026-01-05');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ text: 'end ', isTag: false });
+      expect(result[1]).toEqual({ text: '@2026-01-05', isTag: false, isDate: true, date: '2026-01-05' });
+    });
+
+    it('handles only tags, no dates', () => {
+      const result = splitPartsWithDate('#tag1 #tag2', '2026-01-05');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ text: '#tag1', isTag: true });
+      expect(result[1]).toEqual({ text: ' ', isTag: false });
+      expect(result[2]).toEqual({ text: '#tag2', isTag: true });
+    });
+
+    it('handles plain text with no dates or tags', () => {
+      const result = splitPartsWithDate('plain text', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ text: 'plain text', isTag: false });
+    });
+
+    it('date at start requires whitespace or string start', () => {
+      // foo@2026-01-05 should not match due to missing word boundary
+      const result = splitPartsWithDate('foo@2026-01-05', '2026-01-05');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({ text: 'foo@2026-01-05', isTag: false });
+    });
+
+    it('does not mark date from a different iso value in text', () => {
+      const result = splitPartsWithDate('has @2026-02-10', '2026-01-05');
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual({ text: 'has ', isTag: false });
+      expect(result[1]).toEqual({ text: '@2026-02-10', isTag: false });
+      expect(result[1].isDate).toBeUndefined();
+      expect(result[1].date).toBeUndefined();
     });
   });
 });

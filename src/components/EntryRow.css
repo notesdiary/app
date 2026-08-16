@@ -141,6 +141,26 @@
   color: #22d0ef;
 }
 
+.date-pill {
+  background: transparent;
+  border: none;
+  color: #8b5cf6;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  text-decoration: none;
+  transition: color 200ms;
+}
+
+.date-pill:hover {
+  color: #a78bfa;
+}
+
+.date-pill-text {
+  color: #8b5cf6;
+}
+
 .entry-edit-textarea {
   width: 100%;
   font-family: inherit;
@@ -193,6 +213,18 @@
 
   .tag-link:hover {
     color: #00a9ce;
+  }
+
+  .date-pill {
+    color: #c4b5fd;
+  }
+
+  .date-pill:hover {
+    color: #a78bfa;
+  }
+
+  .date-pill-text {
+    color: #c4b5fd;
   }
 
   .entry-edit-textarea {

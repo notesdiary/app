@@ -1,5 +1,6 @@
 import { Entry } from '../types';
-import { splitParts, splitSections } from '../lib/tags';
+import { splitParts, splitSections, parseSectionDate } from '../lib/tags';
+import { formatDateWithYear } from '../lib/dateUtils';
 import { AppIcon } from './AppIcon';
 import './LeftRail.css';
 
@@ -7,6 +8,8 @@ interface LeftRailProps {
   entries: Entry[];
   selectedTags: string[];
   onTagClick: (tag: string) => void;
+  selectedDate: string | null;
+  onDateClick: (date: string) => void;
   archivedCount: number;
   onSettingsClick: () => void;
   onArchiveClick: () => void;
@@ -17,8 +20,9 @@ interface LeftRailProps {
 }
 
 export function LeftRail(props: LeftRailProps) {
-  // Scan all entries for tags
+  // Scan all entries for tags and dates
   const tagCounts: Record<string, number> = {};
+  const dateCounts: Record<string, number> = {};
   let untaggedCount = 0;
 
   props.entries.forEach(entry => {
@@ -33,6 +37,12 @@ export function LeftRail(props: LeftRailProps) {
         tags.forEach(tag => {
           tagCounts[tag] = (tagCounts[tag] || 0) + 1;
         });
+      }
+
+      // Compute date for this section
+      const date = parseSectionDate(section);
+      if (date !== null) {
+        dateCounts[date] = (dateCounts[date] || 0) + 1;
       }
     });
   });
@@ -49,6 +59,11 @@ export function LeftRail(props: LeftRailProps) {
 
   // Include untagged if it has entries
   const allTags = untaggedCount > 0 ? [{ tag: '__untagged__', count: untaggedCount }, ...sortedTags] : sortedTags;
+
+  // Sort dates descending (ISO strings sort lexicographically correctly)
+  const sortedDates = Object.entries(dateCounts)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, count]) => ({ date, count }));
 
   return (
     <div className={`left-rail ${props.isMobile ? 'mobile' : 'desktop'} ${props.isOpen ? 'open' : 'closed'}`}>
@@ -76,6 +91,31 @@ export function LeftRail(props: LeftRailProps) {
                 >
                   <span className="tag-name">{isUntagged ? 'Untagged' : tag}</span>
                   <span className="tag-count">{count}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="browse-by-date-section">
+        <div className="section-header">Browse by date</div>
+
+        <div className="date-browser">
+          {sortedDates.length === 0 ? (
+            <div className="no-dates">No dates found</div>
+          ) : (
+            sortedDates.map(({ date, count }) => {
+              const isSelected = props.selectedDate === date;
+
+              return (
+                <button
+                  key={date}
+                  className={`date-item ${isSelected ? 'selected' : ''}`}
+                  onClick={() => props.onDateClick(date)}
+                >
+                  <span className="date-name">{formatDateWithYear(date)}</span>
+                  <span className="date-count">{count}</span>
                 </button>
               );
             })

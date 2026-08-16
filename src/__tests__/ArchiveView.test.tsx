@@ -271,4 +271,20 @@ describe('ArchiveView', () => {
       expect(screen.getByText('Line 3')).toBeInTheDocument();
     });
   });
+
+  it('renders retroactive date pills as non-interactive spans in archived entries', async () => {
+    const entry = await createEntry('2026-07-15', '10:30', 'Retro @2026-01-05');
+    await archiveEntry(entry.id);
+
+    const mockBackClick = vi.fn();
+    render(<ArchiveView onBackClick={mockBackClick} />);
+
+    await waitFor(() => {
+      // Should have the date pill text span with correct label
+      const datePillText = document.querySelector('.date-pill-text');
+      expect(datePillText).toBeInTheDocument();
+      expect(datePillText?.tagName).toBe('SPAN');
+      expect(datePillText?.textContent).toBe('Jan 5, 2026');
+    });
+  });
 });

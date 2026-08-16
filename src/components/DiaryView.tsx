@@ -9,6 +9,7 @@ interface DiaryViewProps {
   entries: Entry[];
   searchQuery: string;
   selectedTags: string[];
+  selectedDate: string | null;
   composerText: string;
   editingId: string | null;
   editText: string;
@@ -19,6 +20,7 @@ interface DiaryViewProps {
   onEditTextChange: (text: string) => void;
   onEditSave: () => void;
   onTagClick: (tag: string) => void;
+  onDateClick: (date: string) => void;
   onEntryRemove: (id: string) => void;
   onEntryClickToEdit: (id: string) => void;
   onHamburgerClick: () => void;
@@ -46,12 +48,14 @@ export function DiaryView(props: DiaryViewProps) {
           entries={props.entries}
           mode={props.mode}
           selectedTags={props.selectedTags}
+          selectedDate={props.selectedDate}
           searchQuery={props.searchQuery}
           editingId={props.editingId}
           editText={props.editText}
           onEditTextChange={props.onEditTextChange}
           onEditSave={props.onEditSave}
           onTagClick={props.onTagClick}
+          onDateClick={props.onDateClick}
           onRemove={props.onEntryRemove}
           onClickToEdit={props.onEntryClickToEdit}
         />

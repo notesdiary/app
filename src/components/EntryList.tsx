@@ -7,12 +7,14 @@ interface EntryListProps {
   entries: Entry[];
   mode: ViewMode;
   selectedTags: string[];
+  selectedDate: string | null;
   searchQuery: string;
   editingId: string | null;
   editText: string;
   onEditTextChange: (text: string) => void;
   onEditSave: () => void;
   onTagClick: (tag: string) => void;
+  onDateClick: (date: string) => void;
   onRemove: (id: string) => void;
   onClickToEdit: (id: string) => void;
 }
@@ -30,12 +32,14 @@ export function EntryList(props: EntryListProps) {
           entry={entry}
           mode={props.mode}
           selectedTags={props.selectedTags}
+          selectedDate={props.selectedDate}
           searchQuery={props.searchQuery}
           isEditing={props.editingId === entry.id}
           editText={props.editText}
           onEditTextChange={props.onEditTextChange}
           onEditSave={props.onEditSave}
           onTagClick={(tag, e) => props.onTagClick(tag)}
+          onDateClick={(date, e) => props.onDateClick(date)}
           onRemove={() => props.onRemove(entry.id)}
           onClickToEdit={() => props.onClickToEdit(entry.id)}
         />

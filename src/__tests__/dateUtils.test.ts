@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTodayISO, formatDate, formatTime } from '../lib/dateUtils';
+import { getTodayISO, formatDate, formatDateWithYear, formatTime } from '../lib/dateUtils';
 
 describe('dateUtils', () => {
   describe('getTodayISO', () => {
@@ -34,6 +34,20 @@ describe('dateUtils', () => {
       const result = formatDate('2024-01-01');
       expect(result.weekday).toBe('Mon');
       expect(result.md).toBe('Jan 1');
+    });
+  });
+
+  describe('formatDateWithYear', () => {
+    it('formats 2026-01-05 correctly', () => {
+      expect(formatDateWithYear('2026-01-05')).toBe('Jan 5, 2026');
+    });
+
+    it('formats 2024-12-31 correctly', () => {
+      expect(formatDateWithYear('2024-12-31')).toBe('Dec 31, 2024');
+    });
+
+    it('formats 2024-07-01 correctly', () => {
+      expect(formatDateWithYear('2024-07-01')).toBe('Jul 1, 2024');
     });
   });
 

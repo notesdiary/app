@@ -26,6 +26,18 @@ export function formatDate(iso: string): { weekday: string; md: string } {
   };
 }
 
+export function formatDateWithYear(iso: string): string {
+  const date = new Date(iso + 'T00:00:00Z');
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const month = months[date.getUTCMonth()];
+  const day = date.getUTCDate();
+  const year = date.getUTCFullYear();
+
+  return `${month} ${day}, ${year}`;
+}
+
 export function formatTime(hhmm: string): string {
   const [hours, minutes] = hhmm.split(':').map(Number);
 
