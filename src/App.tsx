@@ -624,6 +624,10 @@ function App() {
   };
 
   const syncAllNow = async () => {
+    // Pull before pushing: this browser may hold no driveFileId at all (a
+    // freshly re-created project on a new device) and knows nothing about
+    // backup files produced by another device's filter rules.
+    await handleDiscoverDriveFolder();
     await syncAllFilters();
   };
 
@@ -734,24 +738,32 @@ function App() {
       // Process each filter rule
       const updatedFilterSyncState = { ...filterSyncState };
 
+      // Merge target for both passes below: union-by-id, local wins.
+      const localIds = new Set(entries.map(e => e.id));
+      const entriesToAdd: Entry[] = [];
+      const pullFile = async (fileId: string) => {
+        for (const remote of await readEntriesFile(project, fileId)) {
+          if (!localIds.has(remote.id)) {
+            localIds.add(remote.id);
+            entriesToAdd.push(remote);
+          }
+        }
+      };
+
+      // Files a local rule already accounts for — either pulled just now or
+      // pulled by an earlier run (which recorded the driveFileId).
+      const claimedFileIds = new Set<string>();
+
       for (const rule of filterRules) {
         const fileName = ensureJsonExtension(rule.fileName);
         const file = fileMap.get(fileName);
+        if (!file?.id) continue;
+        claimedFileIds.add(file.id);
 
         // If file exists on Drive and we don't have its driveFileId yet, download it
-        if (file?.id && !filterSyncState[rule.id]?.driveFileId) {
+        if (!filterSyncState[rule.id]?.driveFileId) {
           try {
-            const remoteEntries = await readEntriesFile(project, file.id);
-
-            // Merge: union-by-id, local-wins on collision
-            const localIds = new Set(entries.map(e => e.id));
-            const entriesToAdd = remoteEntries.filter(r => !localIds.has(r.id));
-
-            // Persist remote-only entries locally
-            if (entriesToAdd.length > 0) {
-              await putEntries(entriesToAdd);
-              setEntries(prev => prev.concat(entriesToAdd.filter(r => !prev.find(l => l.id === r.id))));
-            }
+            await pullFile(file.id);
 
             // Record the driveFileId in filterSyncState
             updatedFilterSyncState[rule.id] = {
@@ -763,6 +775,28 @@ function App() {
             console.error(`Failed to download file for rule ${rule.id}:`, error);
           }
         }
+      }
+
+      // Backup files in this project's folder that no local rule references
+      // still hold this project's entries: filter rules are local-only and are
+      // never stored on Drive, so a browser that re-created the project (same
+      // name, new device) knows only its auto-seeded remainder rule and would
+      // otherwise ignore every file the other device's rules produced. Pull
+      // them read-only — no rule is invented for them, so nothing writes back
+      // to those files from here.
+      for (const file of files) {
+        if (!file.id || claimedFileIds.has(file.id)) continue;
+        try {
+          await pullFile(file.id);
+        } catch (error) {
+          console.error(`Failed to download unreferenced Drive file ${file.name}:`, error);
+        }
+      }
+
+      // Persist everything pulled above
+      if (entriesToAdd.length > 0) {
+        await putEntries(entriesToAdd);
+        setEntries(prev => prev.concat(entriesToAdd.filter(r => !prev.find(l => l.id === r.id))));
       }
 
       // Persist the updated filterSyncState
