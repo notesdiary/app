@@ -29,7 +29,7 @@ const filesList = vi.fn(async () => [] as Array<{ id: string; name?: string }>);
 const filesWrite = vi.fn(async () => ({ id: 'uploaded-file-id' }));
 const filesRead = vi.fn(async () => null as string | Blob | null);
 const filesRemove = vi.fn(async () => {});
-const getConnection = vi.fn(async () => null as { email: string; needsReauth: boolean; expiresAt: number | null } | null);
+const getConnection = vi.fn(async () => ({ email: 'user@example.com', needsReauth: false, expiresAt: null }));
 const connect = vi.fn(async () => ({ email: 'user@example.com', needsReauth: false, expiresAt: null }));
 const disconnect = vi.fn(async () => {});
 const permissionsList = vi.fn(async () => []);
