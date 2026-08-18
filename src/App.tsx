@@ -549,24 +549,42 @@ function App() {
       }
 
       if (driveFileId) {
-        // File exists on Drive — union local with remote (local wins on id collision)
-        console.log(`[Sync] Reading existing file ${driveFileId} for rule ${id}`);
-        const remoteEntries = await readEntriesFile(project, driveFileId);
-        const remoteOnly = remoteEntries.filter(r => !localMatches.find(l => l.id === r.id));
-        const merged = localMatches.concat(remoteOnly);
+        // Check whether the Drive file has changed since we last read/wrote
+        // it. If it hasn't, nothing else has touched it since our last sync,
+        // so local is authoritative and we can write it as-is — including
+        // deletions, which a blind union-merge would otherwise silently
+        // resurrect from the still-present remote copy. Only fall back to
+        // merging remote content in when the file actually changed underneath
+        // us (first-time sync, or an edit from another device).
+        const fileState = await project.files.status(driveFileId);
 
-        // Persist remote-only entries locally so they appear in the app
-        if (remoteOnly.length > 0) {
-          await putEntries(remoteOnly);
-          setEntries(prev => prev.concat(remoteOnly.filter(r => !prev.find(l => l.id === r.id))));
+        if (!fileState.changedSinceRestore) {
+          console.log(`[Sync] Remote unchanged since last sync — writing local state as-is to ${driveFileId}`);
+          await project.files.write({
+            fileId: driveFileId,
+            content: JSON.stringify(localMatches, null, 2),
+            mimeType: 'application/json',
+          });
+        } else {
+          // File exists on Drive — union local with remote (local wins on id collision)
+          console.log(`[Sync] Reading existing file ${driveFileId} for rule ${id}`);
+          const remoteEntries = await readEntriesFile(project, driveFileId);
+          const remoteOnly = remoteEntries.filter(r => !localMatches.find(l => l.id === r.id));
+          const merged = localMatches.concat(remoteOnly);
+
+          // Persist remote-only entries locally so they appear in the app
+          if (remoteOnly.length > 0) {
+            await putEntries(remoteOnly);
+            setEntries(prev => prev.concat(remoteOnly.filter(r => !prev.find(l => l.id === r.id))));
+          }
+
+          console.log(`[Sync] Writing merged data (${merged.length} entries) to file ${driveFileId}`);
+          await project.files.write({
+            fileId: driveFileId,
+            content: JSON.stringify(merged, null, 2),
+            mimeType: 'application/json',
+          });
         }
-
-        console.log(`[Sync] Writing merged data (${merged.length} entries) to file ${driveFileId}`);
-        await project.files.write({
-          fileId: driveFileId,
-          content: JSON.stringify(merged, null, 2),
-          mimeType: 'application/json',
-        });
       } else {
         // No remote file yet — create one with local matches
         const filename = ensureJsonExtension(fileName);

@@ -52,6 +52,13 @@ const filesRead = vi.fn(async (fileId: string) =>
 );
 const filesWrite = vi.fn(async () => ({ id: REMOTE_FILE.id }));
 const filesRemove = vi.fn(async () => {});
+// This browser has never restored/written these files before, so — same as
+// a real never-synced client — the remote is always reported as changed,
+// which keeps these tests on the merge path they're actually exercising.
+const filesStatus = vi.fn(async () => ({
+  fileId: 'unused', exists: true, baseVersion: null, remoteVersion: '1',
+  changedSinceRestore: true, lastRestoredAt: null,
+}));
 const getConnection = vi.fn(async () => ({ email: 'user@example.com', needsReauth: false, expiresAt: null }));
 const connect = vi.fn(async () => ({ email: 'user@example.com', needsReauth: false, expiresAt: null }));
 
@@ -60,7 +67,7 @@ const fakeProjectHandle = {
   getConnection,
   disconnect: vi.fn(async () => {}),
   ensureFolderPath: vi.fn(async () => 'shared-folder-id'),
-  files: { list: filesList, read: filesRead, write: filesWrite, remove: filesRemove },
+  files: { list: filesList, read: filesRead, write: filesWrite, remove: filesRemove, status: filesStatus },
   permissions: { list: vi.fn(async () => []), grant: vi.fn(), update: vi.fn(), revoke: vi.fn() },
 };
 
